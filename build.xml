@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="" default="build" name="grumpy">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.8"/>
+    <property name="source" value="1.8"/>
+    <path id="grumpy.classpath">
+        <pathelement location="bin"/>
+        <pathelement location="lib/soot-trunk.jar"/>
+    </path>
+    <target name="init">
+        <mkdir dir="bin"/>
+        <copy includeemptydirs="false" todir="bin">
+            <fileset dir="src">
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+        <copy includeemptydirs="false" todir="bin">
+            <fileset dir="app">
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+    </target>
+    <target name="clean">
+        <delete dir="bin"/>
+    </target>
+    <target depends="clean" name="cleanall"/>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects"/>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false" source="${source}" target="${target}">
+            <src path="src"/>
+            <src path="app"/>
+            <classpath refid="grumpy.classpath"/>
+        </javac>
+    </target>
+    <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+    <target name="Main">
+        <java classname="Main" failonerror="true" fork="yes">
+            <classpath refid="grumpy.classpath"/>
+        </java>
+    </target>
+    <target name="dist" depends="build">
+      <jar jarfile="grumpy.jar" basedir="bin" includes="**" update="false">
+        <fileset dir="bin" includes="**"/>
+        <manifest>
+      	  <attribute name="Main-Class" value="Main"/>
+          <attribute name="Class-Path" value="lib/soot-trunk.jar"/>
+          <!--            value="${soot_loc} ${json-simple_loc} ${interproc_loc}"/> -->
+        </manifest>
+      </jar>
+  </target>
+</project>
