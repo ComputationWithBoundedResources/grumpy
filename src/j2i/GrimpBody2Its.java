@@ -269,6 +269,11 @@ public class GrimpBody2Its {
 			return newVal((IntConstant) expr);
 		} else if(expr instanceof LongConstant) {
 			return newVal((LongConstant) expr);
+		} else if(expr instanceof CmpExpr || expr instanceof CmplExpr || expr instanceof CmpgExpr) {
+			// TODO: 
+			// comparison using long uses intermediate expressions eg l1 > l2 == (l1 cmp l2) < 0; in general these are
+			// non-trivial to handle; ie we need extra rules; but maybe it is enough to consider some cases
+			return newVar(freshLocal());
 		} else if(expr instanceof BinopExpr) {
 			Value op1 = ((BinopExpr) expr).getOp1();
 			Value op2 = ((BinopExpr) expr).getOp2();
