@@ -16,6 +16,8 @@ Though there are several intentional restrictions making the analysis in general
   * static fields are considered as read-only parameter
 
 
+#### Example
+
 Following Java program
 ```java
 import java.uitl.*;
