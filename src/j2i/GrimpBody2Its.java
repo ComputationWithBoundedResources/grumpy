@@ -59,10 +59,10 @@ public class GrimpBody2Its {
 		Map<String, String> opts = new HashMap<>();
 		opts.put("enabled", "true");
 		opts.put("only-stack-locals", "false");
-		Aggregator.v().transform(body, null);
-		ConstructorFolder.v().transform(m, null, opts);
-		Aggregator.v().transform(m, null);
-		UnusedLocalEliminator.v().transform(m, null, opts);
+		// Aggregator.v().transform(body, null);
+		// ConstructorFolder.v().transform(m, null, opts);
+		// Aggregator.v().transform(m, null);
+		// UnusedLocalEliminator.v().transform(m, null, opts);
 		return m;
 	}
 
@@ -71,6 +71,7 @@ public class GrimpBody2Its {
 	}
 
 	private static boolean isPrimitive(final Type type) {
+		System.out.println("type: " + type);
 		return
 				type == ShortType.v()
 						|| type == IntType.v()
@@ -78,6 +79,7 @@ public class GrimpBody2Its {
 	}
 
 	private static boolean isPrimitive(final Value val) {
+		System.out.println("val: " + val);
 		return isPrimitive(val.getType());
 	}
 
@@ -94,9 +96,11 @@ public class GrimpBody2Its {
 	// restrict to int-like local variables
 	private List<Value> initActiveLocals(GrimpBody body) {
 		List<Value> locals = new ArrayList<>();
+		System.out.println("bodylocals: " + body.getLocals());
 		for(Local local : body.getLocals()) {
 			if(isPrimitive(local)) locals.add(local);
 		}
+		System.out.println("locals: " + locals);
 		return locals;
 	}
 
@@ -280,12 +284,20 @@ public class GrimpBody2Its {
 			Expr expr1 = transformExpression(op1);
 			Expr expr2 = transformExpression(op2);
 			if(expr instanceof AddExpr) {
-				return new AExpr(expr1, BAOp.Add, expr2);
+				return new AAExpr(expr1, BAOp.Add, expr2);
 			} else if(expr instanceof MulExpr) {
-				return new AExpr(expr1, BAOp.Mul, expr2);
+				return new AAExpr(expr1, BAOp.Mul, expr2);
 			} else if(expr instanceof SubExpr) {
-				return new AExpr(expr1, BAOp.Add, new UnaryMinus(expr2));
+				return new AAExpr(expr1, BAOp.Add, new UnaryMinus(expr2));
 			}
+		} else if(expr instanceof InvokeExpr){
+			InvokeExpr e = (InvokeExpr) expr;
+			System.out.println(e.getMethod());
+			System.out.println(e.getMethod().getDeclaration());
+			System.out.println(e.getMethod().getDeclaringClass());
+			System.out.println(e.getMethod().getActiveBody());
+			System.out.println(e.getMethodRef());
+			System.out.println(e.getType());
 		}
 		return newVar(freshLocal());
 	}
@@ -338,6 +350,7 @@ public class GrimpBody2Its {
 		Term lhs = newTerm(stmt);
 		Term rhs = newTerm(next);
 		Expr v = newVar(local);
+		System.out.println("assign:" + expr);
 		Expr aexpr = transformExpression(expr);
 		List<Expr> args = rhs.getArgs();
 		args.replaceAll(e -> e.equals(v) ? aexpr : e);

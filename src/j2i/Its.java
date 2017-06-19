@@ -171,14 +171,14 @@ class Rule implements PPKoAT {
 
 class Term implements PPKoAT {
 	Symbol label;
-	List<Expr> args;
+	List<AExpr> args;
 
-	public Term(Symbol label, List<Expr> args) {
+	public Term(Symbol label, List<AExpr> args) {
 		this.label = label;
 		this.args = args;
 	}
 
-	public List<Expr> getArgs() {
+	public List<AExpr> getArgs() {
 		return this.args;
 	}
 
@@ -194,9 +194,9 @@ class Term implements PPKoAT {
 	@Override
 	public String ppKoAT() {
 		StringBuilder b = new StringBuilder();
-		Iterator<Expr> it = this.args.iterator();
+		Iterator<AExpr> it = this.args.iterator();
 		while(it.hasNext()) {
-			Expr e = it.next();
+			AExpr e = it.next();
 			b.append(e.toNormalform().ppKoAT());
 			if(it.hasNext())
 				b.append(", ");
@@ -205,201 +205,201 @@ class Term implements PPKoAT {
 	}
 }
 
-abstract class Expr implements PPKoAT {
+// abstract class Expr implements PPKoAT {
 
-	// KoAT's expression parser is a bit picky, especially with parentheses. It looks (unnecessary) complicated and I do
-	// not want to modify it. Thus we bring expressions in normalform; that is we distribute multiplication over
-	// addition. Parentheses are only used for unary minus.
-	public abstract Expr toNormalform();
+// 	// KoAT's expression parser is a bit picky, especially with parentheses. It looks (unnecessary) complicated and I do
+// 	// not want to modify it. Thus we bring expressions in normalform; that is we distribute multiplication over
+// 	// addition. Parentheses are only used for unary minus.
+// 	public abstract Expr toNormalform();
 
-	@Override
-	protected Object clone() throws CloneNotSupportedException {
-		return super.clone();
-	}
-}
+// 	@Override
+// 	protected Object clone() throws CloneNotSupportedException {
+// 		return super.clone();
+// 	}
+// }
 
-class Var extends Expr implements PPKoAT {
-	Symbol var;
+// class Var extends Expr implements PPKoAT {
+// 	Symbol var;
 
-	public Var(Symbol var) {
-		this.var = var;
-	}
+// 	public Var(Symbol var) {
+// 		this.var = var;
+// 	}
 
-	public Var(String var) {
-		this.var = new Symbol(var);
-	}
+// 	public Var(String var) {
+// 		this.var = new Symbol(var);
+// 	}
 
-	@Override
-	public Expr toNormalform() {
-		return new Var(this.var);
-	}
+// 	@Override
+// 	public Expr toNormalform() {
+// 		return new Var(this.var);
+// 	}
 
-	@Override
-	public String toString() {
-		return this.var.toString();
-	}
+// 	@Override
+// 	public String toString() {
+// 		return this.var.toString();
+// 	}
 
-	@Override
-	public String ppKoAT() {
-		return this.var.toString();
-	}
+// 	@Override
+// 	public String ppKoAT() {
+// 		return this.var.toString();
+// 	}
 
-	@Override
-	public boolean equals(Object o) {
-		if(this == o) return true;
-		if(o == null || getClass() != o.getClass()) return false;
+// 	@Override
+// 	public boolean equals(Object o) {
+// 		if(this == o) return true;
+// 		if(o == null || getClass() != o.getClass()) return false;
 
-		Var var1 = (Var) o;
+// 		Var var1 = (Var) o;
 
-		return var != null ? var.equals(var1.var) : var1.var == null;
-	}
+// 		return var != null ? var.equals(var1.var) : var1.var == null;
+// 	}
 
-	@Override
-	public int hashCode() {
-		return var != null ? var.hashCode() : 0;
-	}
-}
+// 	@Override
+// 	public int hashCode() {
+// 		return var != null ? var.hashCode() : 0;
+// 	}
+// }
 
-class Val extends Expr {
-	long val;
+// class Val extends Expr {
+// 	long val;
 
-	public Val(long val) {
-		this.val = val;
-	}
+// 	public Val(long val) {
+// 		this.val = val;
+// 	}
 
-	public long getVal() {
-		return this.val;
-	}
+// 	public long getVal() {
+// 		return this.val;
+// 	}
 
-	@Override
-	public Expr toNormalform() {
-		if(this.val < 0) {
-			return new UnaryMinus(new Val(-this.val));
-		} else {
-			return new Val(this.val);
-		}
-	}
+// 	@Override
+// 	public Expr toNormalform() {
+// 		if(this.val < 0) {
+// 			return new UnaryMinus(new Val(-this.val));
+// 		} else {
+// 			return new Val(this.val);
+// 		}
+// 	}
 
-	@Override
-	public String toString() {
-		return Long.toString(this.val);
-	}
+// 	@Override
+// 	public String toString() {
+// 		return Long.toString(this.val);
+// 	}
 
-	@Override
-	public String ppKoAT() {
-		return Long.toString(this.val);
-	}
-}
+// 	@Override
+// 	public String ppKoAT() {
+// 		return Long.toString(this.val);
+// 	}
+// }
 
-class UnaryMinus extends Expr implements PPKoAT {
-	Expr neg;
+// class UnaryMinus extends Expr implements PPKoAT {
+// 	Expr neg;
 
-	public UnaryMinus(Expr e) {
-		this.neg = e;
-	}
+// 	public UnaryMinus(Expr e) {
+// 		this.neg = e;
+// 	}
 
-	@Override
-	public Expr toNormalform() {
-		Expr e1 = this.neg.toNormalform();
-		if(e1 instanceof UnaryMinus) {
-			return ((UnaryMinus) e1).neg;
-		}
-		return new UnaryMinus(e1);
-	}
+// 	@Override
+// 	public Expr toNormalform() {
+// 		Expr e1 = this.neg.toNormalform();
+// 		if(e1 instanceof UnaryMinus) {
+// 			return ((UnaryMinus) e1).neg;
+// 		}
+// 		return new UnaryMinus(e1);
+// 	}
 
-	@Override
-	public String toString() {
-		// return "(0 - " + this.neg + ")";
-		return "(-" + this.neg + ")";
-	}
+// 	@Override
+// 	public String toString() {
+// 		// return "(0 - " + this.neg + ")";
+// 		return "(-" + this.neg + ")";
+// 	}
 
-	@Override
-	public String ppKoAT() {
-		return this.toString();
-	}
-}
+// 	@Override
+// 	public String ppKoAT() {
+// 		return this.toString();
+// 	}
+// }
 
-class AExpr extends Expr implements PPKoAT {
-	Expr lhs;
-	BAOp bop;
-	Expr rhs;
+// class AAExpr extends Expr implements PPKoAT {
+// 	Expr lhs;
+// 	BAOp bop;
+// 	Expr rhs;
 
-	public AExpr(Expr lhs, BAOp bop, Expr rhs) {
-		this.lhs = lhs;
-		this.bop = bop;
-		this.rhs = rhs;
-	}
+// 	public AAExpr(Expr lhs, BAOp bop, Expr rhs) {
+// 		this.lhs = lhs;
+// 		this.bop = bop;
+// 		this.rhs = rhs;
+// 	}
 
-	// KoAT is bad with arbitrary expressions containing parentheses
-	@Override
-	public Expr toNormalform() {
-		Expr lhs1 = lhs.toNormalform();
-		Expr rhs1 = rhs.toNormalform();
-		if(lhs1 instanceof Val && rhs1 instanceof Val) {
-			long v1 = ((Val) lhs1).getVal();
-			long v2 = ((Val) rhs1).getVal();
-			switch(this.bop) {
-				case Add:
-					return new Val(v1 + v2);
-				case Mul:
-					return new Val(v1 * v2);
-			}
-		}
-		if(this.bop == BAOp.Mul) {
-			if(lhs1 instanceof AExpr &&
-					((AExpr) lhs1).bop == BAOp.Add) {
-				// (a.b)*c = a*c . b*c
-				Expr a = ((AExpr) lhs1).lhs;
-				Expr b = ((AExpr) lhs1).rhs;
-				Expr c = this.rhs;
-				AExpr e1 = new AExpr(a, BAOp.Mul, c);
-				AExpr e2 = new AExpr(b, BAOp.Mul, c);
-				return new AExpr(e1, BAOp.Add, e2);
-			} else if(rhs1 instanceof AExpr &&
-					((AExpr) rhs1).bop == BAOp.Add) {
-				// c*(a.b) = a*c . b*c
-				Expr a = ((AExpr) rhs1).lhs;
-				Expr b = ((AExpr) rhs1).rhs;
-				Expr c = this.lhs;
-				AExpr e1 = new AExpr(a, BAOp.Mul, c);
-				AExpr e2 = new AExpr(b, BAOp.Mul, c);
-				return new AExpr(e1, BAOp.Add, e2);
-			}
-		}
+// 	// KoAT is bad with arbitrary expressions containing parentheses
+// 	@Override
+// 	public Expr toNormalform() {
+// 		Expr lhs1 = lhs.toNormalform();
+// 		Expr rhs1 = rhs.toNormalform();
+// 		if(lhs1 instanceof Val && rhs1 instanceof Val) {
+// 			long v1 = ((Val) lhs1).getVal();
+// 			long v2 = ((Val) rhs1).getVal();
+// 			switch(this.bop) {
+// 				case Add:
+// 					return new Val(v1 + v2);
+// 				case Mul:
+// 					return new Val(v1 * v2);
+// 			}
+// 		}
+// 		if(this.bop == BAOp.Mul) {
+// 			if(lhs1 instanceof AAExpr &&
+// 					((AAExpr) lhs1).bop == BAOp.Add) {
+// 				// (a.b)*c = a*c . b*c
+// 				Expr a = ((AAExpr) lhs1).lhs;
+// 				Expr b = ((AAExpr) lhs1).rhs;
+// 				Expr c = this.rhs;
+// 				AAExpr e1 = new AAExpr(a, BAOp.Mul, c);
+// 				AAExpr e2 = new AAExpr(b, BAOp.Mul, c);
+// 				return new AAExpr(e1, BAOp.Add, e2);
+// 			} else if(rhs1 instanceof AAExpr &&
+// 					((AAExpr) rhs1).bop == BAOp.Add) {
+// 				// c*(a.b) = a*c . b*c
+// 				Expr a = ((AAExpr) rhs1).lhs;
+// 				Expr b = ((AAExpr) rhs1).rhs;
+// 				Expr c = this.lhs;
+// 				AAExpr e1 = new AAExpr(a, BAOp.Mul, c);
+// 				AAExpr e2 = new AAExpr(b, BAOp.Mul, c);
+// 				return new AAExpr(e1, BAOp.Add, e2);
+// 			}
+// 		}
 
-		return new AExpr(this.lhs, this.bop, this.rhs);
-	}
+// 		return new AAExpr(this.lhs, this.bop, this.rhs);
+// 	}
 
-	@Override
-	public String toString() {
-		return this.lhs + " " + this.bop + " " + this.rhs;
-	}
+// 	@Override
+// 	public String toString() {
+// 		return this.lhs + " " + this.bop + " " + this.rhs;
+// 	}
 
-	@Override
-	public String ppKoAT() {
-		return
-				this.lhs.ppKoAT()
-						+ " "
-						+ this.bop.ppKoAT()
-						+ " "
-						+ this.rhs.ppKoAT();
-	}
+// 	@Override
+// 	public String ppKoAT() {
+// 		return
+// 				this.lhs.ppKoAT()
+// 						+ " "
+// 						+ this.bop.ppKoAT()
+// 						+ " "
+// 						+ this.rhs.ppKoAT();
+// 	}
 
 
-}
+// }
 
 class Constraint implements PPKoAT {
-	Expr lhs;
+	AExpr lhs;
 	BRel rel;
-	Expr rhs;
+	AExpr rhs;
 
-	public Constraint(Expr lhs, BRel rel, Expr rhs) {
+	public Constraint(AExpr lhs, BRel rel, AExpr rhs) {
 		this.lhs = lhs;
 		this.rel = rel;
 		this.rhs = rhs;
 	}
 
-	public void setConstraint(Expr lhs, BRel rel, Expr rhs) {
+	public void setConstraint(AExpr lhs, BRel rel, AExpr rhs) {
 		this.lhs = lhs;
 		this.rel = rel;
 		this.rhs = rhs;

@@ -5,31 +5,45 @@
     <property name="target" value="1.8"/>
     <property name="source" value="1.8"/>
     <path id="grumpy.classpath">
-        <pathelement location="bin"/>
+        <pathelement location="build"/>
         <pathelement location="lib/soot-trunk.jar"/>
+        <pathelement location="lib/json-simple-1.1.jar"/>
+        <pathelement location="lib/antlr-runtime-4.7.jar"/>
     </path>
     <target name="init">
-        <mkdir dir="bin"/>
-        <copy includeemptydirs="false" todir="bin">
+        <mkdir dir="build"/>
+        <copy includeemptydirs="false" todir="build">
             <fileset dir="src">
                 <exclude name="**/*.java"/>
             </fileset>
         </copy>
-        <copy includeemptydirs="false" todir="bin">
+        <copy includeemptydirs="false" todir="build">
             <fileset dir="app">
                 <exclude name="**/*.java"/>
             </fileset>
         </copy>
     </target>
     <target name="clean">
-        <delete dir="bin"/>
+        <delete dir="build"/>
+        <!-- ANTLR generated files -->
+        <delete file="src/j2i/AExprBaseListener.java"/>
+        <delete file="src/j2i/AExpr.tokens"/>
+        <delete file="src/j2i/AExprLexer.java"/>
+        <delete file="src/j2i/AExprLexer.tokens"/>
+        <delete file="src/j2i/AExprListener.java"/>
+        <delete file="src/j2i/AExprParser.java"/>
     </target>
     <target depends="clean" name="cleanall"/>
-    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="antlr">
+      <java jar="lib/antlr-4.7-complete.jar" fork="true">
+        <arg value="src/j2i/AExpr.g4"/>
+      </java>
+    </target>
+    <target depends="antlr,build-subprojects,build-project" name="build"/>
     <target name="build-subprojects"/>
     <target depends="init" name="build-project">
         <echo message="${ant.project.name}: ${ant.file}"/>
-        <javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false" source="${source}" target="${target}">
+        <javac debug="true" debuglevel="${debuglevel}" destdir="build" includeantruntime="false" source="${source}" target="${target}">
             <src path="src"/>
             <src path="app"/>
             <classpath refid="grumpy.classpath"/>
@@ -42,11 +56,11 @@
         </java>
     </target>
     <target name="dist" depends="build">
-      <jar jarfile="grumpy.jar" basedir="bin" includes="**" update="false">
-        <fileset dir="bin" includes="**"/>
+      <jar jarfile="grumpy.jar" basedir="build" includes="**" update="false">
+        <fileset dir="build" includes="**"/>
         <manifest>
       	  <attribute name="Main-Class" value="Main"/>
-          <attribute name="Class-Path" value="lib/soot-trunk.jar"/>
+          <attribute name="Class-Path" value="lib/json-simple-1.1.jar lib/soot-trunk.jar lib/antlr-runtime-4.7.jar"/>
           <!--            value="${soot_loc} ${json-simple_loc} ${interproc_loc}"/> -->
         </manifest>
       </jar>
