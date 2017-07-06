@@ -130,7 +130,6 @@ public class MethodSummaries {
 		for(Object _clazz : _clazzes){
 			JSONObject clazz = (JSONObject) _clazz;
 			String cname = (String) clazz.get("class");
-			System.out.println("trying class: " + cname);
 			for(Object _method : (JSONArray) clazz.get("methods")){
 				JSONObject method = (JSONObject) _method;
 				String mname = (String) method.get("name");
@@ -253,11 +252,11 @@ class MethodSummary {
 
 		Formula fm = Formula.empty();
 		for(Map.Entry<String,AExpr> entry : this.lowerSize.entrySet())
-			fm = fm.and( gt(new Var(entry.getKey()), entry.getValue()) );
+			fm = fm.and( ge(new Var(entry.getKey()), entry.getValue()) );
 		for(Map.Entry<String,AExpr> entry : this.upperSize.entrySet())
-			fm = fm.and( lt(new Var(entry.getKey()), entry.getValue()) );
+			fm = fm.and( le(new Var(entry.getKey()), entry.getValue()) );
 		for(String entry : this.modifies)
-			fm = fm.and( eq(new Var(entry, true), new Var("imm_"+vid)) );
+			fm = fm.and( eq(new Var(entry, true), new Var("imm_"+ ++vid)) );
 		return fm;
 	} 
 

@@ -17,6 +17,7 @@ abstract public class Formula implements PrettyPrint {
 	public static Atom le(AExpr lhs, AExpr rhs) { return new Atom(new LeConstraint(lhs,rhs)); }
 	public static Atom lt(AExpr lhs, AExpr rhs) { return new Atom(new LtConstraint(lhs,rhs)); }
 	public static Atom eq(AExpr lhs, AExpr rhs) { return new Atom(new EqConstraint(lhs,rhs)); }
+	public static Atom as(AExpr lhs, AExpr rhs) { return new Atom(new AsConstraint(lhs,rhs)); }
 	public And and(Formula a){ return new And(this, a); }
 
 	// Composing expressions:

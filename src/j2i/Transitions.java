@@ -49,10 +49,6 @@ class Transition {
 		this.upper = upper;
 	}
 
-	public String toKoAT() {
-		// return this.lhs.ppKoAT() + " -> " + this.rhs.ppKoAT() + (this.constraints.isEmpty() ? "" : " :|: " + b.toString());
-		return "<" + from + "," + to + ">" + " :|: " + guard.pp();
-	}
 }
 
 class KoAT{
@@ -96,8 +92,12 @@ class KoAT{
 	public String toString(){
 		StringBuilder b = new StringBuilder();
 		b.append("(GOAL COMPLEXITY)\n");
-		// String s = this.transitionis.isEmpty() ? "start" : this.transitions.get(0).lhs.label.toString();
-		String s = "label_0";
+		if(this.transitions.isEmpty()){
+			b.append("(STARTTERM (FUNCTIONSYMBOLS start))\n");
+			b.append("start(x) -> end(x)\n");
+	    return b.toString();
+		}
+		String s = this.transitions.iterator().next().from.toString();
 		b.append("(STARTTERM (FUNCTIONSYMBOLS " + s + "))\n");
 		b.append("(VAR )\n");
 		b.append("(RULES\n");

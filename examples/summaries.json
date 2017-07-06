@@ -1,6 +1,34 @@
 {
     "summaries": [
         {
+            "class": "java.lang.Integer",
+            "methods": [
+                {
+                    "name": "intValue",
+                    "descriptor":"()I",
+                    "static": false,
+                    "complexity": {
+                        "lowerTime": "1",
+                        "upperTime": "1",
+                    },
+                    "lowerSize": [
+                        {
+                            "pos": "ret",
+                            "bound": "this"
+                        },
+                    ],
+                    "upperSize": [
+                        {
+                            "pos": "ret",
+                            "bound": "this"
+                        },
+                    ],
+                    "modifies": [],
+                    
+                },
+            ],
+        },
+        {
             "class": "java.util.Vector",
             "methods": [
                 {
@@ -604,6 +632,25 @@
                         },
                     ],
                     "modifies": ["this"],
+                },
+            ],
+        },
+        {
+            "class": "Overloading",
+            "methods": [
+                {
+                    "name": "run",
+                    "descriptor": "(LA;)V",
+                    "static": true,
+                    "complexity": {
+                        "lowerTime": "1",
+                        "upperTime": "1",
+                        "upperSpace": "0",
+                        "lowerSpace": "0"
+                    },
+                    "lowerSize": [ ],
+                    "upperSize": [ ],
+                    "modifies": [],
                 },
             ],
         },

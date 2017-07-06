@@ -14,12 +14,14 @@ import static j2i.Formula.*;
 
 // domain {{{ //
 final class Domain implements Iterable<Var> {
-	List<Var> elements = new ArrayList<>();
+	Set<Var> elements = new LinkedHashSet<>();
 
 	public void addLocals(JimpleBody body){
 		for(Local local : body.getLocals()) this.elements.add( Grumpy.var(local) );
 		// if(Grumpy.isPrimitive(local)) this.elements.add( Grumpy.var(local) );
 	}
+
+	public void add(Var v){ this.elements.add(v); }
 
 	public void addFields(JimpleBody body){
 		for(SootField field : body.getMethod().getDeclaringClass().getFields())
@@ -56,7 +58,7 @@ public final class Grumpy {
 	// like fresh variables; but used for temporary results
 	private Var imm(){ return new Var("imm_" + varId++); }
 
-	final private Var ret  = new Var("ret");
+	final private Var rez  = new Var("ret");
 	final private Var thiz = new Var("this");
 
 
@@ -110,10 +112,13 @@ public final class Grumpy {
 	static String getSymbol(Value value)        { return value.toString(); }
 	static Var var(Value value)                 { return new Var(getSymbol(value)); }
 	static Var pvar(Value value)                { return new Var(getSymbol(value),true); }
-	static String getSymbol(SootField field)    { return field.getDeclaringClass().getName() + ":" + field.getName(); }
+	static String getSymbol(SootField field)    { return field.getDeclaringClass().getName() + "." + field.getName(); }
 	static String getSymbol(StaticFieldRef ref) { return getSymbol(ref.getField()); }
 	static Var var(SootField field)             { return new Var(getSymbol(field)); }
 	static Var var(StaticFieldRef ref)          { return new Var(getSymbol(ref)); }
+	static Var var(InstanceFieldRef ref)        { return new Var(getSymbol(ref.getBase())); }
+	static Var pvar(StaticFieldRef ref)         { return new Var(getSymbol(ref),true); }
+	static Var pvar(InstanceFieldRef ref)        { return new Var(getSymbol(ref.getBase()),true); }
 
 	// public static Atom ne(AExpr lhs, AExpr rhs) { return new Atom(new NeConstraint(lhs,rhs)); }
 	// }}} helper functions //
@@ -156,10 +161,10 @@ public final class Grumpy {
 		Value op2 = stmt.getRightOp();
 
 		Formula guard;
-		if( op1 instanceof Local )            guard = assignRValue((Local) op1, op2);
-		if( op1 instanceof StaticFieldRef )   guard = assignImmediate((StaticFieldRef) op1, (Immediate) op2);
-		if( op1 instanceof InstanceFieldRef ) guard = assignImmediate((InstanceFieldRef) op1, (Immediate) op2);
-		if( op1 instanceof ArrayRef )         guard = assignImmediate((ArrayRef) op1, (Immediate) op2);
+		if( op1 instanceof Local )                 guard = assignRValue((Local) op1, op2);
+		else if( op1 instanceof StaticFieldRef )   guard = assignImmediate((StaticFieldRef) op1, (Immediate) op2);
+		else if( op1 instanceof InstanceFieldRef ) guard = assignImmediate((InstanceFieldRef) op1, (Immediate) op2);
+		else if( op1 instanceof ArrayRef )         guard = assignImmediate((ArrayRef) op1, (Immediate) op2);
 		else
 			throw new RuntimeException("transformAssignStmt: unexpected stmt: "
 					+ op1 + "@" + op1.getClass() + " := " + op2 + "@" + op2.getClass());
@@ -167,7 +172,7 @@ public final class Grumpy {
 		return new Transitions( currentLabel(stmt), guard, nextLabel() );
 	}
 
-	private Formula assignUndefined(Local local){ return eq( pvar(local), transformUndefinedValue() ); }
+	private Formula assignUndefined(Local local){ return as( pvar(local), transformUndefinedValue() ); }
 
 	private Formula assignIdentity() { return Formula.empty(); }
 
@@ -179,9 +184,9 @@ public final class Grumpy {
 				+ local + "@" + local.getClass() + " := " + rvalue + "@" + rvalue.getClass());
 	}
 
-	private Formula assignImmediate(Local local, Immediate imm){ return eq( pvar(local),var(imm) ); }
+	private Formula assignImmediate(Local local, Immediate imm){ return as( pvar(local),var(imm) ); }
 
-	private Formula assignImmediate(StaticFieldRef ref, Immediate imm){ return eq( pvar(ref),var(imm) ); }
+	private Formula assignImmediate(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),var(imm) ); }
 
 	private Formula assignImmediate(InstanceFieldRef ref, Immediate imm){
 		Local base = (Local) ref.getBase();
@@ -194,9 +199,9 @@ public final class Grumpy {
 
 	private Formula assignRef(Local local, Ref ref){
 		Var lhs = pvar(local);
-		if( ref instanceof StaticFieldRef )   return eq( lhs, var((StaticFieldRef) ref) );
+		if( ref instanceof StaticFieldRef )   return as( lhs, var((StaticFieldRef) ref) );
 		if( ref instanceof InstanceFieldRef ) return ge( lhs, Val.zero() ).and( lt(lhs, var((InstanceFieldRef) ref)) );
-		if( ref instanceof ArrayRef )         return eq( lhs, var((ArrayRef) ref) );
+		if( ref instanceof ArrayRef )         return as( lhs, var((ArrayRef) ref) );
 		throw new RuntimeException("assignRef: unexpected ref: "
 				+ local + "@" + local.getClass() + " := " + ref + "@" + ref.getClass());
 	}
@@ -225,9 +230,9 @@ public final class Grumpy {
 		AExpr imm1 = transformImmediate( (Immediate) expr.getOp1() );
 		AExpr imm2 = transformImmediate( (Immediate) expr.getOp2() );
 
-		if( expr instanceof AddExpr )	return eq( lhs,new Add(imm1,imm2) );
-		if( expr instanceof MulExpr ) return eq( lhs,new Mul(imm1,imm2) );
-		if( expr instanceof SubExpr ) return eq( lhs,new Sub(imm1,imm2) );
+		if( expr instanceof AddExpr )	return as( lhs,new Add(imm1,imm2) );
+		if( expr instanceof MulExpr ) return as( lhs,new Mul(imm1,imm2) );
+		if( expr instanceof SubExpr ) return as( lhs,new Sub(imm1,imm2) );
 
 		// CmpExpr, CmpgExpr, CmplExpr  - comparison for long, float
 		// ConditionExpr                - occur in ifgoto statements
@@ -239,23 +244,23 @@ public final class Grumpy {
 	// We ignore casts and conversions (unsound for narrowing conversions).
 	// The JVM checkcast instruction may throw an ClassCastException - we ignore exceptional control flow. Widening
 	// conversions do not modify the value. Narrowing conversions may modify the value, eg lont -> int
-	public Formula assignCastExpr(Local local, CastExpr expr){ return assignIdentity(); }
+	public Formula assignCastExpr(Local local, CastExpr expr){ return assignRValue(local, expr.getOp()); }
 
 	// JVM instanceof returns 0 if expr is null, 1 if expr is instanced of resolved class, 0 otherwise.
 	// Ignore, as the abstraction can not be refined wrt to runtime instance.
 	public Formula assignInstanceOfExpr(Local local, InstanceOfExpr expr){ return assignUndefined(local); }
 
 	public Formula assignAnyNewExpr(Local local, AnyNewExpr expr){
-		if ( expr instanceof NewExpr ) return eq( pvar(local),Val.one() );
+		if ( expr instanceof NewExpr ) return as( pvar(local),Val.one() );
 		return assignUndefined(local); // NewArrayExpr, NewMultiArrayExpr
 	}
 
 	public Formula assignLengthExpr(Local local, LengthExpr expr){ return assignUndefined(local); }
 
-	public Formula assignNegExpr(Local local, NegExpr expr){ return eq( pvar(local), new Sub(Val.zero(),var(local)) ); }
+	public Formula assignNegExpr(Local local, NegExpr expr){ return as( pvar(local), new Sub(Val.zero(),var(local)) ); }
 
 	public Formula assignInvokeExpr(Local local, InvokeExpr expr){
-		return  evalInvokeExpr(expr).and( eq(pvar(local), this.ret) );
+		return  evalInvokeExpr(expr).and( as(pvar(local), this.rez) );
 	}
 
 
@@ -266,9 +271,16 @@ public final class Grumpy {
 		if( expr instanceof InstanceInvokeExpr
 				|| expr instanceof StaticInvokeExpr ) {
 			SootMethodRef ref = expr.getMethodRef();
-			MethodSummary msum = resolve(ref).orElse(MethodSummary.defaultSummary());
+			Optional<MethodSummary> msumM = resolve(ref);
+			MethodSummary msum;
+			if(msumM.isPresent()){
+				msum = msumM.get();
+			} else {
+				System.out.println("DEF: use default summary for" + expr);
+				msum = MethodSummary.defaultSummary();
+			}
 			return evalMethodSummary(expr, msum);
-				}
+		}
 		throw new RuntimeException("evalInvokeExpr: unexpected expr: " + expr + "@" + expr.getClass() );
 	}
 
@@ -282,14 +294,14 @@ public final class Grumpy {
 		// substitute arg1,...,arg_n with imm_1,...,imm_n
 		int i = 1;
 		for(Value val : expr.getArgs()){
-			if(val instanceof Local) effect = effect.substitute( new Var("arg" + i), pvar( (Local) val ) );
+			if(val instanceof Local) effect = effect.substitute( new Var("arg" + i), var( (Local) val ) );
 			i++;
 		}
 
 		// substitute this with base
 		if(expr instanceof InstanceInvokeExpr){
 			Local base = (Local) ((InstanceInvokeExpr) expr).getBase();
-			effect = effect.substitute( this.thiz, pvar(base) );
+			effect = effect.substitute( this.thiz, var(base) );
 		}
 
 		return effect;
@@ -301,112 +313,13 @@ public final class Grumpy {
 	// a representation of all possible calls.
 	// We ignore descriptors for now (unsound).
 	private Optional<MethodSummary> resolve(SootMethodRef ref){
-		String cname = ref.declaringClass().getJavaStyleName();
+		String cname = ref.declaringClass().getName();
 		String mname = ref.name();
 		String descr = Util.getMethodDescriptor(ref.resolve());
+		System.out.println("trying:<" + cname + "," + mname +"," + descr +">");
 		return this.summaries.get(cname,mname,descr);
 	}
 
-
-	// // Assign Statement {{{ //
-	// private Transitions transformAssignStmt(AssignStmt stmt){
-	// 	Value op1 = stmt.getLeftOp();
-	// 	Value op2 = stmt.getRightOp();
-
-	// 	Formula guard;
-	//   if ( op1 instanceof Local )	                guard = assignRValue((Local) op1,    op2);
-	//   if ( op1 instanceof StaticFieldRef )	  guard = assignImmediate((StaticFieldRef) op1,   (Immediate) op2);
-	//   else if ( op1 instanceof InstanceFieldRef ) guard = assignImmediate((InstanceFieldRef) op1, (Immediate) op2);
-	//   else if ( op1 instanceof ArrayRef )	        guard = assignImmediate((ArrayRef) op1,         (Immediate) op2);
-	// 	else
-	// 		throw new RuntimeException("transformAssignStmt: unexpected stmt: "
-	// 				+ op1 + "@" + op1.getClass() + " := " + op2 + "@" + op2.getClass());
-	// 	return new Transitions( currentLabel(stmt), guard, nextLabel() );
-	// }
-
-
-	// 	private Formula transformAssignStmt(Local local, Value value){
-
-	// 		if( value instanceof Immediate ) return transformRValue(local, (Immediate) value);
-	// 		if( value instanceof Ref ){
-	// 			if( value instanceof StaticFieldRef )
-	// 			if( value instanceof InstanceFieldRef )
-	// 			if( value instanceof InstanceFieldRef )
-	// 		}
-	// 		if( value instanceof Expr )      return transformRValue(local, (Expr) value);
-
-	// 		throw new RuntimeException("transformAssignStmt: unexpected stmt: "
-	// 				+ local + "@" + local.getClass() + " := " + value + "@" + value.getClass());
-	// 	}
-
-	// 	private Formula transformRValue(Local local, Immediate imm){
-	// 		return = eq( pvar(local), transformImmediate(imm) );
-	// 	}
-
-	// 	private Transitions transformRValue(AssignStmt stmt, Local local, Ref ref){
-	// 		if ( ref instanceof StaticFieldRef )   return transformRValue(stmt, local, (StaticFieldRef) ref);
-	// 		if ( ref instanceof InstanceFieldRef ) return transformRValue(stmt, local, (InstanceFieldRef) ref);
-	// 		if ( ref instanceof ArrayRef )         return transformRValue(stmt,local, (ArrayRef) ref);
-
-	// 		throw new RuntimeException("transformRValue: unexpected stmt: "
-	// 				+ local + "@" + local.getClass() + " := " + ref + "@" + ref.getClass());
-	// 	}
-
-	// 	private Transitions transformRValue(AssignStmt stmt, Local local, StaticFieldRef ref){
-	// 		Formula guard = eq( pvar(local), var(ref) );
-	// 		return new Transitions( currentLabel(stmt), guard, nextLabel() );
-	// 	}
-
-	// 	private Transitions transformRValue(AssignStmt stmt, Local local, InstanceFieldRef ref){
-	// 		AExpr lhs = pvar(local);
-	// 		Formula guard = ge( lhs, Val.zero() ).and( lt(lhs, pvar(ref)) );
-	// 		return new Transitions( currentLabel(stmt), guard, nextLabel() );
-	// 	}
-
-
-	// 	private Transitions transformRValue(AssignStmt stmt, Local local, ArrayRef ref){
-	// 		Formula guard = eq( pvar(local), var(ref) );
-	// 		return new Transitions( currentLabel(stmt), guard, nextLabel() );
-	// 	}
-
-	// 	private Transitions transformRValue(AssignStmt stmt, Local local, Expr expr){
-
-	// 		Formula guard;
-	// 		if( expr instanceof BinopExpr )           guard = assignBinopExpr(Local local, (BinopExpr) expr);
-	// 		else if( expr instanceof CastExpr )       guard = assignCastExpr(Local local, (CastExpr) expr);
-	// 		else if( expr instanceof InstanceOfExpr ) guard = assignInstanceOfExpr(Local, (InstanceOfExpr) expr);
-	// 		else if( expr instanceof InvokeExpr )     guard = assignExpr(Local local, (InvokeExpr) expr);
-	// 		else if( expr instanceof AnyNewExpr )     guard = assignExpr(Local local, (AnyNewExpr) expr);
-	// 		else if( expr instanceof LengthExpr )     guard = assignExpr(Local local, (LengthExpr) expr);
-	// 		else if( expr instanceof NegExpr )        guard = assignNegExpr(local local, (NegExpr) expr);
-	// 		else
-	// 		throw new RuntimeException("transformRValue: unexpected stmt: "
-	// 				+ local + "@" + local.getClass() + " := " + expr + "@" + expr.getClass());
-
-	// 	}
-
-	// public Formula assignBinopExpr(Local local, BinopExpr expr){
-	// 	// Conditional operations are currently only addressed in ifgoto. The operations are 'native', the result is
-	// 	// either 0 or 1. If we want to support them in general we need support for DNF formula and specialize the guards
-	// 	// respectively, eg eg (a CmpExpr b) := a > b && res 0 || a <= b && res 1; or just return two transitions.
-
-	// 	Var lhs = pvar(local);
-	// AExpr imm1 = transformImmediate( (Immediate) expr.getOp1() );
-	// AExpr imm2 = transformImmediate( (Immediate) expr.getOp2() );
-
-	// 	if( expr instanceof AddExpr )	return = eq( lhs,new Add(imm1,imm2) );
-	// 	if( expr instanceof MulExpr ) return = eq( lhs,new Mul(imm1,imm2) );
-	// 	if( expr instanceof SubExpr ) return = eq( lhs,new Sub(imm1,imm2) );
-
-	// 	// CmpExpr, CmpgExpr, CmplExpr  - comparison for long, float
-	// 	// ConditionExpr                - occur in ifgoto statements
-	// 	// DivExpr, RemExpr             - unsupported arith operations
-	// 	// AndExpr, OrExpr, XorExpr, ShlExpr, ShrExpr, UShrExpr - shiftoperations are undefined
-	// 	return eq( lhs, transformUndefinedValue() );
-	// }
-
-
-	// // }}} Assign Statement //
 
 	private Transitions transformGotoStmt(GotoStmt stmt){
 		Stmt target = (Stmt) stmt.getTarget();
@@ -418,37 +331,51 @@ public final class Grumpy {
 		ConditionExpr condition = (ConditionExpr) stmt.getCondition();
 		Stmt target = stmt.getTarget();
 
-		AExpr imm1 = transformImmediate( (Immediate) condition.getOp1() );
-		AExpr imm2 = transformImmediate( (Immediate) condition.getOp2() );
+		Immediate op1 = (Immediate) condition.getOp1();
+		Immediate op2 = (Immediate) condition.getOp2();
+		AExpr imm1 = transformImmediate( op1 );
+		AExpr imm2 = transformImmediate( op2 );
 
 		Transitions ts = new Transitions();
 
 		if( condition instanceof GtExpr )
 			return ts
 				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), le(imm2,imm1), nextLabel()         ));
-		if( condition instanceof GeExpr )
+				.add(new Transition( currentLabel(stmt), le(imm1,imm2), nextLabel()         ));
+		if( condition instanceof GeExpr ){
 			return ts
 				.add(new Transition( currentLabel(stmt), ge(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), lt(imm2,imm1), nextLabel()         ));
+				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
+		}
 		if( condition instanceof LeExpr )
 			return ts
 				.add(new Transition( currentLabel(stmt), le(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), gt(imm2,imm1), nextLabel()         ));
+				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ));
 		if( condition instanceof LtExpr )
 			return ts
 				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), ge(imm2,imm1), nextLabel()         ));
+				.add(new Transition( currentLabel(stmt), ge(imm1,imm2), nextLabel()         ));
+		if( condition instanceof EqExpr && op1 instanceof NullConstant )
+			return ts
+				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
+				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
+		if( condition instanceof EqExpr && op2 instanceof NullConstant )
+			return ts
+				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
+				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ));
 		if( condition instanceof EqExpr )
 			return ts
 				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), gt(imm2,imm1), nextLabel()         ))
-				.add(new Transition( currentLabel(stmt), lt(imm2,imm1), nextLabel()         ));
-		if( condition instanceof NeExpr )
+				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ))
+				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
+		if( condition instanceof NeExpr && op1 instanceof NullConstant )
+			return ts
+				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), targetLabel(target) ))
+				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), nextLabel()         ));
+		if( condition instanceof NeExpr && op2 instanceof NullConstant )
 			return ts
 				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), eq(imm2,imm1), nextLabel()         ));
+				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), nextLabel()         ));
 
 		throw new RuntimeException("transformIfStmt: unexpected stmt: " + stmt + "@" + stmt.getClass() + ":" + condition + "@" + condition.getClass());
 

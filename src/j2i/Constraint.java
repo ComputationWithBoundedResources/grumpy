@@ -29,7 +29,7 @@ class GtConstraint extends Constraint {
 }
 class LeConstraint extends Constraint {
   public LeConstraint(AExpr lhs , AExpr rhs) { super(lhs,rhs); }
-	public String pp()                         { return ppWith("=<"); }
+	public String pp()                         { return ppWith("<="); }
 }
 class LtConstraint extends Constraint {
   public LtConstraint(AExpr lhs , AExpr rhs) { super(lhs,rhs); }
@@ -37,5 +37,10 @@ class LtConstraint extends Constraint {
 }
 class EqConstraint extends Constraint {
   public EqConstraint(AExpr lhs , AExpr rhs) { super(lhs,rhs); }
+	public String pp()                         { return ppWith("="); }
+}
+// assignment ~ as oriented equation
+class AsConstraint extends Constraint {
+  public AsConstraint(AExpr lhs , AExpr rhs) { super(lhs,rhs); }
 	public String pp()                         { return ppWith("="); }
 }

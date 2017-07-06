@@ -19,7 +19,7 @@ final public class LabelMaker {
 	private int ic = 0;
 
 
-	private static String fromInt(int i){ return "label#" + i; }
+	private static String fromInt(int i){ return "labeL" + i; }
 
 
 	public LabelMaker(JimpleBody body)  { this.definedLabels =  new NormalUnitPrinter(body).labels(); }

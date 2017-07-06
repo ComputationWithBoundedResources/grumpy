@@ -10,11 +10,11 @@ public class Main {
 
 	public static void main(String[] margs) {
 
-		Transform t = new Transform("jtp.Jbc2Its", new Jimple2ItsTransformer());
+		// Transform t = new Transform("jtp.Jbc2Its", new Jimple2ItsTransformer());
+		Transform t = new Transform("jtp.Jbc2Its", new WithKoAT());
 		PackManager.v().getPack("jtp").add(t);
 		Options.v().set_output_format(Options.output_format_none);
 		//
-		//Transform t = new Transform("jtp.Jbc2Its", new WithKoAT());
 		//// Options.v().set_whole_program(true);
 
 		////String[] args = {
