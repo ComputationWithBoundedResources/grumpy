@@ -105,7 +105,7 @@ public final class Grumpy {
 	private boolean hasDefinedLabel(Unit stmt) { return this.labelMaker.hasDefinedLabel(stmt); }
 	private Label currentLabel(Unit stmt)      { return this.labelMaker.currentLabel(stmt); }
 	private Label targetLabel(Unit stmt)       { return this.labelMaker.targetLabel(stmt); }
-	private Label fallthrougLabel()            { return this.labelMaker.fallthrougLabel(); }
+	private Label fallthrougLabel()            { return this.labelMaker.fallthroughLabel(); }
 
 	final static Var res	= new Var("res");
 
@@ -378,7 +378,7 @@ public final class Grumpy {
 		if( condition instanceof NeExpr && op2 instanceof NullConstant )
 			return ts
 				.add(new Transition( from, gt(imm1,imm2), to ))
-				.add(new Transition( from, eq(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, eq(imm1,imm2), next ));
 
 		throw new RuntimeException("transformIfStmt: unexpected stmt: " + stmt + "@" + stmt.getClass() + ":" + condition + "@" + condition.getClass());
 
@@ -386,7 +386,7 @@ public final class Grumpy {
 
 	private Transitions transformInvokeStmt(InvokeStmt stmt){
 		Formula guard = evalInvokeExpr(stmt.getInvokeExpr());
-		return new Transitions( currentLabel(stmt), guard, nextLabel() );
+		return new Transitions( currentLabel(stmt), guard, fallthrougLabel() );
 	}
 
 	// Refinement on immediate variables are not really helpful, thus we model switch as non-deterministic jumps.
@@ -402,7 +402,7 @@ public final class Grumpy {
 	private Transitions transformReturnStmt(Stmt stmt){ return Transitions.empty(); }
 
 	private Transitions transformIdentityStmt(Stmt stmt){
-		if (hasDefinedLabel(stmt)) return new Transitions(currentLabel(stmt), nextLabel());
+		if (hasDefinedLabel(stmt)) return new Transitions(currentLabel(stmt), fallthrougLabel());
 		else return Transitions.empty();
 	}
 

@@ -18,23 +18,22 @@ class List<T> implements Iterable<T>{
 
 class ListFun {
 
+	// O(n)
 	static void iterate(List l){
 		while(l != null){
 			l = l.next;
 		}
 	}
 
+
+	// O(n^2)
+	// to obtain expected linear bound it is necessary to pattern match list size
+	// ie list = elem + rest
 	static void iterate2(List<Integer> l){
 		while(l != null){
 			int a = l.elem;
-			while(a >= 0){
-				--a;
-			}
+			while(a >= 0) --a;
 			l = l.next;
-			// l = elem + next /\ a' = elem
-			// a >= 0 /\ a' = a-1
-			// l = elem + next /\ tmp' = next
-			// l = elem + next /\ l' >= 0 /\ l' < 1+tmp'
 		}
 	}
 
