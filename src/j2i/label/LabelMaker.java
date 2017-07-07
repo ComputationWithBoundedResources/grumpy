@@ -19,7 +19,8 @@ final public class LabelMaker {
 	private int ic = 0;
 
 
-	private static String fromInt(int i){ return "labeL" + i; }
+	private static String fromInt(int i){ return "marke" + i; }
+	private Label fresh()               { return new Label(fromInt(ic++)); }
 
 
 	public LabelMaker(JimpleBody body)  { this.definedLabels =  new NormalUnitPrinter(body).labels(); }
@@ -37,12 +38,14 @@ final public class LabelMaker {
 
 	public Label targetLabel(Unit stmt){
 		String label = this.definedLabels.get(stmt);
-		if(label != null) return new Label(label, true);
-		else throw new RuntimeException("targetLabel: unlabelled target: " + stmt);
+		if(label != null) {
+		  this.label = fresh();
+			return new Label(label, true);
+		} else throw new RuntimeException("targetLabel: unlabelled target: " + stmt);
 	}
 
-	public Label nextLabel(){
-		this.label = new Label(fromInt(ic++));
+	public Label fallthroughLabel(){
+		this.label = fresh();
 		return this.label;
 	}
 }

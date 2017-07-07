@@ -105,7 +105,7 @@ public final class Grumpy {
 	private boolean hasDefinedLabel(Unit stmt) { return this.labelMaker.hasDefinedLabel(stmt); }
 	private Label currentLabel(Unit stmt)      { return this.labelMaker.currentLabel(stmt); }
 	private Label targetLabel(Unit stmt)       { return this.labelMaker.targetLabel(stmt); }
-	private Label nextLabel()                  { return this.labelMaker.nextLabel(); }
+	private Label fallthrougLabel()            { return this.labelMaker.fallthrougLabel(); }
 
 	final static Var res	= new Var("res");
 
@@ -169,7 +169,7 @@ public final class Grumpy {
 			throw new RuntimeException("transformAssignStmt: unexpected stmt: "
 					+ op1 + "@" + op1.getClass() + " := " + op2 + "@" + op2.getClass());
 
-		return new Transitions( currentLabel(stmt), guard, nextLabel() );
+		return new Transitions( currentLabel(stmt), guard, fallthrougLabel() );
 	}
 
 	private Formula assignUndefined(Local local){ return as( pvar(local), transformUndefinedValue() ); }
@@ -338,44 +338,47 @@ public final class Grumpy {
 
 		Transitions ts = new Transitions();
 
+		Label from = currentLabel(stmt);
+		Label to   = targetLabel(target);
+		Label next = fallthrougLabel();
+
 		if( condition instanceof GtExpr )
 			return ts
-				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), le(imm1,imm2), nextLabel()         ));
-		if( condition instanceof GeExpr ){
+				.add(new Transition( from, gt(imm1,imm2), to ))
+				.add(new Transition( from, le(imm1,imm2), next ));
+		if( condition instanceof GeExpr )
 			return ts
-				.add(new Transition( currentLabel(stmt), ge(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
-		}
+				.add(new Transition( from, ge(imm1,imm2), to ))
+				.add(new Transition( from, lt(imm1,imm2), next ));
 		if( condition instanceof LeExpr )
 			return ts
-				.add(new Transition( currentLabel(stmt), le(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, le(imm1,imm2), to ))
+				.add(new Transition( from, gt(imm1,imm2), next ));
 		if( condition instanceof LtExpr )
 			return ts
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), ge(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, lt(imm1,imm2), to ))
+				.add(new Transition( from, ge(imm1,imm2), next ));
 		if( condition instanceof EqExpr && op1 instanceof NullConstant )
 			return ts
-				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, eq(imm1,imm2), to ))
+				.add(new Transition( from, lt(imm1,imm2), next ));
 		if( condition instanceof EqExpr && op2 instanceof NullConstant )
 			return ts
-				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, eq(imm1,imm2), to ))
+				.add(new Transition( from, gt(imm1,imm2), next ));
 		if( condition instanceof EqExpr )
 			return ts
-				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), nextLabel()         ))
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, eq(imm1,imm2), to ))
+				.add(new Transition( from, gt(imm1,imm2), next ))
+				.add(new Transition( from, lt(imm1,imm2), next ));
 		if( condition instanceof NeExpr && op1 instanceof NullConstant )
 			return ts
-				.add(new Transition( currentLabel(stmt), lt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, lt(imm1,imm2), to ))
+				.add(new Transition( from, eq(imm1,imm2), next ));
 		if( condition instanceof NeExpr && op2 instanceof NullConstant )
 			return ts
-				.add(new Transition( currentLabel(stmt), gt(imm1,imm2), targetLabel(target) ))
-				.add(new Transition( currentLabel(stmt), eq(imm1,imm2), nextLabel()         ));
+				.add(new Transition( from, gt(imm1,imm2), to ))
+				.add(new Transition( from, eq(imm1,imm2), nextLabel()         ));
 
 		throw new RuntimeException("transformIfStmt: unexpected stmt: " + stmt + "@" + stmt.getClass() + ":" + condition + "@" + condition.getClass());
 
