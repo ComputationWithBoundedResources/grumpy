@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.function.*;
 
 import soot.*;
+import soot.Type.*;
 import soot.jimple.*;
 
 import j2i.label.*;
@@ -342,43 +343,64 @@ public final class Grumpy {
 		Label to   = targetLabel(target);
 		Label next = fallthrougLabel();
 
-		if( condition instanceof GtExpr )
-			return ts
-				.add(new Transition( from, gt(imm1,imm2), to ))
-				.add(new Transition( from, le(imm1,imm2), next ));
-		if( condition instanceof GeExpr )
-			return ts
-				.add(new Transition( from, ge(imm1,imm2), to ))
-				.add(new Transition( from, lt(imm1,imm2), next ));
-		if( condition instanceof LeExpr )
-			return ts
-				.add(new Transition( from, le(imm1,imm2), to ))
-				.add(new Transition( from, gt(imm1,imm2), next ));
-		if( condition instanceof LtExpr )
-			return ts
-				.add(new Transition( from, lt(imm1,imm2), to ))
-				.add(new Transition( from, ge(imm1,imm2), next ));
-		if( condition instanceof EqExpr && op1 instanceof NullConstant )
-			return ts
-				.add(new Transition( from, eq(imm1,imm2), to ))
-				.add(new Transition( from, lt(imm1,imm2), next ));
-		if( condition instanceof EqExpr && op2 instanceof NullConstant )
-			return ts
-				.add(new Transition( from, eq(imm1,imm2), to ))
-				.add(new Transition( from, gt(imm1,imm2), next ));
-		if( condition instanceof EqExpr )
-			return ts
-				.add(new Transition( from, eq(imm1,imm2), to ))
-				.add(new Transition( from, gt(imm1,imm2), next ))
-				.add(new Transition( from, lt(imm1,imm2), next ));
-		if( condition instanceof NeExpr && op1 instanceof NullConstant )
-			return ts
-				.add(new Transition( from, lt(imm1,imm2), to ))
-				.add(new Transition( from, eq(imm1,imm2), next ));
-		if( condition instanceof NeExpr && op2 instanceof NullConstant )
-			return ts
-				.add(new Transition( from, gt(imm1,imm2), to ))
-				.add(new Transition( from, eq(imm1,imm2), next ));
+		// guards for arithmetic operations over integers as atomic constraint
+		if ( Type.toMachineType(op1.getType()) instanceof IntType ){
+			if( condition instanceof GtExpr )
+				return ts
+					.add(new Transition( from, gt(imm1,imm2), to ))
+					.add(new Transition( from, le(imm1,imm2), next ));
+			if( condition instanceof GeExpr )
+				return ts
+					.add(new Transition( from, ge(imm1,imm2), to ))
+					.add(new Transition( from, lt(imm1,imm2), next ));
+			if( condition instanceof LeExpr )
+				return ts
+					.add(new Transition( from, le(imm1,imm2), to ))
+					.add(new Transition( from, gt(imm1,imm2), next ));
+			if( condition instanceof LtExpr )
+				return ts
+					.add(new Transition( from, lt(imm1,imm2), to ))
+					.add(new Transition( from, ge(imm1,imm2), next ));
+			if( condition instanceof EqExpr )
+				return ts
+					.add(new Transition( from, eq(imm1,imm2), to ))
+					.add(new Transition( from, gt(imm1,imm2), next ))
+					.add(new Transition( from, lt(imm1,imm2), next ));
+			if( condition instanceof NeExpr )
+				return ts
+					.add(new Transition( from, gt(imm1,imm2), to ))
+					.add(new Transition( from, lt(imm1,imm2), to ))
+					.add(new Transition( from, eq(imm1,imm2), next ));
+		}
+
+		// guards for equality tests of references and null
+		if ( op1.getType() instanceof RefLikeType ){
+			if( condition instanceof EqExpr && op1 instanceof NullConstant ) // null == ref
+				return ts
+					.add(new Transition( from, eq(imm1,imm2), to ))
+					.add(new Transition( from, lt(imm1,imm2), next ));
+			if( condition instanceof EqExpr && op2 instanceof NullConstant ) // ref == null
+				return ts
+					.add(new Transition( from, eq(imm1,imm2), to ))
+					.add(new Transition( from, gt(imm1,imm2), next ));
+			if( condition instanceof EqExpr )                                // ref == ref
+				return ts
+					.add(new Transition( from, eq(imm1,imm2), to ))              // ref == ref => size(ref) == size(ref)
+					.add(new Transition( from, Formula.empty(), next ));         // ref != ref => undefined
+
+			if( condition instanceof NeExpr && op1 instanceof NullConstant )
+				return ts
+					.add(new Transition( from, lt(imm1,imm2), to ))
+					.add(new Transition( from, eq(imm1,imm2), next ));
+			if( condition instanceof NeExpr && op2 instanceof NullConstant )
+				return ts
+					.add(new Transition( from, gt(imm1,imm2), to ))
+					.add(new Transition( from, eq(imm1,imm2), next ));
+			if( condition instanceof NeExpr && op2 instanceof NullConstant )
+				return ts
+					.add(new Transition( from, Formula.empty(), to ))
+					.add(new Transition( from, eq(imm1,imm2), next ));
+		}
 
 		throw new RuntimeException("transformIfStmt: unexpected stmt: " + stmt + "@" + stmt.getClass() + ":" + condition + "@" + condition.getClass());
 
