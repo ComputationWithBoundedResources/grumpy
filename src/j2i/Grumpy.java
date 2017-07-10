@@ -1,3 +1,4 @@
+// This package provides a simple transformation form Java bytecode methods to integer transtions systems
 package j2i;
 
 import java.util.*;
@@ -11,7 +12,20 @@ import j2i.label.*;
 
 import static j2i.Formula.*;
 
+/*
+  TODOs:
+	 - compact transition systems
+	   - aggregate expressions and only use defined lables as control flow points
+	 - compute domain
+	   - we want to include static fields (possible from other classes)
+		 - remove unnecessary immediate variables
+	   -> ideally this is done on the (simplified its)
+   - integration of long operations
+   - integration of arithmetic (shift ...)
+ */
 
+
+// size abstraction {{{ //
 // interface for size abstraction
 // * in Jimple getfield/putfield occur only in limited form (see Jimple grammar)
 // * for method calls we use summaries
@@ -28,8 +42,7 @@ abstract class SizeAbstraction{
 	abstract Formula getStaticField(Local local, StaticFieldRef ref);     // x = Y.f
 	abstract Formula getArrayField(Local local, ArrayRef ref);            // x = y[imm]
 }
-
-
+// }}} size abstraction //
 
 // domain {{{ //
 final class Domain implements Iterable<Var> {
@@ -58,32 +71,21 @@ final class Domain implements Iterable<Var> {
 
 // }}} domain //
 
-/* This package provides a simple transformation from Java bytecode methods to integer transition systems.
- *
 
-
-*/
 public final class Grumpy {
 	protected JimpleBody body;
 	protected Domain domain;
 	protected LabelMaker labelMaker;
 	protected MethodSummaries summaries;
-	
+  protected SizeAbstraction sizeAbstraction = new NodesAbstraction();
 
-  private SizeAbstraction sizeAbstraction = new NodesAbstraction();
 	private int varId = 0;
-	// fresh variables
 	protected Var freshVar(){ return new Var("fresh_" + varId++); }
-	// immediate variables
-	// like fresh variables; but used for temporary results
-	private Var imm(){ return new Var("imm_" + varId++); }
-
 	final private Var rez  = new Var("ret");
 	final private Var thiz = new Var("this");
 
 
 	// initialisation {{{ //
-
 	public Grumpy(JimpleBody body){
 		this.body = body;
 		this.labelMaker = new LabelMaker(body);
@@ -92,7 +94,6 @@ public final class Grumpy {
 		this.domain.addFields(body);
 		this.summaries = MethodSummaries.fromFile("summaries.json");
 	}
-
 	// }}} initialisation //
 
 
@@ -199,7 +200,7 @@ public final class Grumpy {
 		if( stmt instanceof RetStmt
 				|| stmt instanceof ReturnStmt
 				|| stmt instanceof ReturnVoidStmt
-				|| stmt instanceof ThrowStmt )       return transformReturnStmt(stmt);
+				|| stmt instanceof ThrowStmt )      return transformReturnStmt(stmt);
 
 		if( stmt instanceof IdentityStmt
 				|| stmt instanceof NopStmt
@@ -486,8 +487,6 @@ public final class Grumpy {
 	// }}} Jimple Statements //
 
 	// Jimple Values {{{ //
-
-
 
 	private AExpr transformImmediate(Immediate imm){
 		if( imm instanceof Local )    return transformLocal((Local) imm);
