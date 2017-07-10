@@ -25,14 +25,16 @@ import static j2i.Formula.*;
  */
 
 
-// size abstraction {{{ //
+// size abstraction {{{ // TODO: generalise for all operations
 // interface for size abstraction
 // * in Jimple getfield/putfield occur only in limited form (see Jimple grammar)
 // * for method calls we use summaries
-// * for equality tests we assume
+// * used assumptions
 //   a == null => size(a) = 0
 //   a != null => size(a) > 0
 //   a == b => size(a) == size(b)
+//   size(new A) = 1
+//   size(new A[imm]) = imm
 abstract class SizeAbstraction{
   abstract Formula putInstanceField(InstanceFieldRef ref, Immediate imm);  // x.f = imm
   abstract Formula putStaticField(StaticFieldRef ref, Immediate imm);      // X.f = imm
@@ -77,7 +79,7 @@ public final class Grumpy {
 	protected Domain domain;
 	protected LabelMaker labelMaker;
 	protected MethodSummaries summaries;
-  protected SizeAbstraction sizeAbstraction = new NodesAbstraction();
+  protected SizeAbstraction sizeAbstraction = new NodeFieldsAbstraction();
 
 	private int varId = 0;
 	protected Var freshVar(){ return new Var("fresh_" + varId++); }
@@ -141,44 +143,44 @@ public final class Grumpy {
 	static Var pvar(StaticFieldRef ref)         { return new Var(getSymbol(ref),true); }
 	static Var pvar(InstanceFieldRef ref)        { return new Var(getSymbol(ref.getBase()),true); }
 
-  private static boolean hasIntType(Value val) { return Type.toMachineType(val.getType()) instanceof IntType; }
-	private static boolean hasRefType(Value val) { return val.getType() instanceof RefLikeType; }
+  private static boolean hasIntType(Value val)       { return Type.toMachineType(val.getType()) instanceof IntType; }
+	private static boolean hasRefType(Value val)       { return val.getType() instanceof RefLikeType; }
+	private static boolean hasRefType(SootField field) { return field.getType() instanceof RefLikeType; }
 
-
-	// public static Atom ne(AExpr lhs, AExpr rhs) { return new Atom(new NeConstraint(lhs,rhs)); }
 	// }}} helper functions //
 
 
-	// Nodes Abstraction {{{ //
+	// node fields abstraction {{{ //
+	// reachability and cyclicity is ignored
 	// see Frohn et al, WST 2013
-	class NodesAbstraction extends SizeAbstraction {
+	class NodeFieldsAbstraction extends SizeAbstraction {
 
 		Formula getInstanceField(Local local, InstanceFieldRef ref){
 			AExpr x = pvar(local);
 			AExpr y = var(ref.getBase());
-			if( hasIntType(local) ) return ge( x, new Neg(y) ).and(lt( x,y ));
+			if( hasIntType(local) ) return ge( x, new Neg(y) ).and(lt( x,y )); // int value can be negative
 			if( hasRefType(local) ) return ge( x, Val.zero() ).and(lt( x,y ));
 			return assignUndefined(local);
 		}
-
-		Formula getStaticField(Local local, StaticFieldRef ref){ return as( pvar(local), var(ref) ); }
-
-		Formula getArrayField(Local local, ArrayRef ref){ return assignUndefined(local); }
-
-
-		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),var(imm) ); }
-
+		// TODO: update of intfields requires sign refinement
+		// we need support for disjunctions ore return multiple transitions here
 		Formula putInstanceField(InstanceFieldRef ref, Immediate imm){
 			Local base = (Local) ref.getBase();
 			Var ivar = var(base); Var ovar = pvar(base);
-			return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,var(imm))) );
+			if( hasRefType(ref.getField()) ) return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,var(imm))) );
+			return ge(ovar, Val.zero());
 		}
 
-		// a[imm1] = imm2 => length(a) == length(a[imm1] = imm2)
-		Formula putArrayField(ArrayRef ref, Immediate imm){ return assignIdentity(); }
+		// static fields are handled like local variables
+		Formula getStaticField(Local local, StaticFieldRef ref)  { return as( pvar(local), var(ref) ); }
+		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),var(imm) ); }
+
+		// length abstraction for arrays
+		Formula getArrayField(Local local, ArrayRef ref){ return assignUndefined(local); } // accessed content is undefined
+		Formula putArrayField(ArrayRef ref, Immediate imm){ return assignIdentity(); } // array update does not change its length
 
 	}
-	// }}} Nodes Abstraction //
+	// }}} node fields abstraction //
 
 
 	// Jimple Statements {{{ //
@@ -212,8 +214,7 @@ public final class Grumpy {
 		throw new RuntimeException("transformStatement: unexpected statement: " + stmt + "@" + stmt.getClass());
 	}
 
-
-	// assignments take a simple form in Jimple; see Jimple Grammar
+	// AssignStmt {{{ //
 	private Transitions transformAssignStmt(AssignStmt stmt){
 		Value op1 = stmt.getLeftOp();
 		Value op2 = stmt.getRightOp();
@@ -230,7 +231,10 @@ public final class Grumpy {
 		return new Transitions( currentLabel(stmt), guard, fallthrougLabel() );
 	}
 
-	private Formula assignUndefined(Local local){ return as( pvar(local), transformUndefinedValue() ); }
+	private Formula assignUndefined(Local local){ 
+		if ( hasRefType(local) ) return ge( pvar(local), Val.zero() );
+		                         return as( pvar(local), transformUndefinedValue() ); 
+	}
 
 	private Formula assignIdentity() { return Formula.empty(); }
 
@@ -244,17 +248,6 @@ public final class Grumpy {
 
 	private Formula assignImmediate(Local local, Immediate imm){ return as( pvar(local),var(imm) ); }
 
-	// private Formula assignImmediate(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),var(imm) ); }
-
-	// private Formula assignImmediate(InstanceFieldRef ref, Immediate imm){
-	// 	Local base = (Local) ref.getBase();
-	// 	Var ivar = var(base); Var ovar = pvar(base);
-	// 	return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,var(imm))) );
-	// }
-
-	// private Formula assignImmediate(ArrayRef ref, Immediate imm){ return assignIdentity(); }
-
-
 	private Formula assignRef(Local local, Ref ref){
 		Var lhs = pvar(local);
 		if( ref instanceof StaticFieldRef )   return sizeAbstraction.getStaticField(local, (StaticFieldRef) ref);
@@ -263,7 +256,6 @@ public final class Grumpy {
 		throw new RuntimeException("assignRef: unexpected ref: "
 				+ local + "@" + local.getClass() + " := " + ref + "@" + ref.getClass());
 	}
-
 
 	private Formula assignExpr(Local local, Expr expr){
 
@@ -376,6 +368,7 @@ public final class Grumpy {
 		System.out.println("trying:<" + cname + "," + mname +"," + descr +">");
 		return this.summaries.get(cname,mname,descr);
 	}
+	// }}} AssignStmt //
 
 
 	private Transitions transformGotoStmt(GotoStmt stmt){
