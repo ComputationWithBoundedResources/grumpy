@@ -16,7 +16,7 @@ public final class WithKoAT extends BodyTransformer {
 	protected void internalTransform(Body body, String string, Map map) {
 		Grumpy m = new Grumpy((JimpleBody) body);
 		KoAT its   = m.jimpleBody2KoAT();
-		KoATExecutor exe = new KoATExecutor(its, "-use-its-parser", "-use-termcomp-format");
+		KoATExecutor exe = new KoATExecutor(its, "-timeout", "30" , "-use-its-parser", "-use-termcomp-format");
 
 		G.v().out.println(">>> Jimple");
 		G.v().out.println(m.body);

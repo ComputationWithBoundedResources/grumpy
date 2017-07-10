@@ -20,7 +20,7 @@ final public class LabelMaker {
 
 
 	private static String fromInt(int i){ return "marke" + i; }
-	private Label fresh()               { return new Label(fromInt(ic++)); }
+	private Label fresh()               { return new Label(fromInt(++ic)); }
 
 
 	public LabelMaker(JimpleBody body)  { this.definedLabels =  new NormalUnitPrinter(body).labels(); }

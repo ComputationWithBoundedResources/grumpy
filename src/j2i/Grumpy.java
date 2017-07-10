@@ -195,6 +195,7 @@ public final class Grumpy {
 		return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,var(imm))) );
 	}
 
+	// a[imm1] = imm2 => length(a) == length(a[imm1] = imm2)
 	private Formula assignImmediate(ArrayRef ref, Immediate imm){ return assignIdentity(); }
 
 
@@ -202,7 +203,7 @@ public final class Grumpy {
 		Var lhs = pvar(local);
 		if( ref instanceof StaticFieldRef )   return as( lhs, var((StaticFieldRef) ref) );
 		if( ref instanceof InstanceFieldRef ) return ge( lhs, Val.zero() ).and( lt(lhs, var((InstanceFieldRef) ref)) );
-		if( ref instanceof ArrayRef )         return as( lhs, var((ArrayRef) ref) );
+		if( ref instanceof ArrayRef )         return as( lhs, var( ((ArrayRef) ref).getBase()) );
 		throw new RuntimeException("assignRef: unexpected ref: "
 				+ local + "@" + local.getClass() + " := " + ref + "@" + ref.getClass());
 	}
@@ -252,18 +253,16 @@ public final class Grumpy {
 	public Formula assignInstanceOfExpr(Local local, InstanceOfExpr expr){ return assignUndefined(local); }
 
 	public Formula assignAnyNewExpr(Local local, AnyNewExpr expr){
-		if ( expr instanceof NewExpr ) return as( pvar(local),Val.one() );
-		return assignUndefined(local); // NewArrayExpr, NewMultiArrayExpr
+		if ( expr instanceof NewExpr )      return as( pvar(local),Val.one() );
+		if ( expr instanceof NewArrayExpr ) return as( pvar(local), transformImmediate((Immediate) ((NewArrayExpr) expr).getSize()) );
+		return assignUndefined(local); // NewMultiArrayExpr
 	}
 
-	public Formula assignLengthExpr(Local local, LengthExpr expr){ return assignUndefined(local); }
+	public Formula assignLengthExpr(Local local, LengthExpr expr) { return as( pvar(local), transformImmediate((Immediate) expr.getOp()) ); }
 
 	public Formula assignNegExpr(Local local, NegExpr expr){ return as( pvar(local), new Sub(Val.zero(),var(local)) ); }
 
-	public Formula assignInvokeExpr(Local local, InvokeExpr expr){
-		return  evalInvokeExpr(expr).and( as(pvar(local), this.rez) );
-	}
-
+	public Formula assignInvokeExpr(Local local, InvokeExpr expr){ return  evalInvokeExpr(expr).and( as(pvar(local), this.rez) ); }
 
 	public Formula evalInvokeExpr(InvokeExpr expr){
 
