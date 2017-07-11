@@ -21,11 +21,13 @@ public class Arrays {
 	}
 
 	static int max(int[] a) {
-		int x = 0;
-		int y = a.length-1;
+		if(a.length > 0){
+			int x = 0;
+			int y = a.length-1;
 
-		// while (x != y) if (a[x] <= a[y]) x++; else y--;
-		while (x < y) if (a[x] <= a[y]) x++; else y--;
-		return x;
+			while (x != y) if (a[x] <= a[y]) x++; else y--;
+			return x;
+		}
+		return -1;
 	}
 }
