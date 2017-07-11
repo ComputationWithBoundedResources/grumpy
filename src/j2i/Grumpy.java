@@ -307,7 +307,8 @@ public final class Grumpy {
 		return assignUndefined(local); // NewMultiArrayExpr
 	}
 
-	public Formula assignLengthExpr(Local local, LengthExpr expr) { return as( pvar(local), transformImmediate((Immediate) expr.getOp()) ); }
+	public Formula assignLengthExpr(Local local, LengthExpr expr) 
+	{ return as( pvar(local), transformImmediate((Immediate) expr.getOp()) ).and( ge( pvar(local),Val.zero() ) ); }
 
 	public Formula assignNegExpr(Local local, NegExpr expr){ return as( pvar(local), new Sub(Val.zero(),var(local)) ); }
 
