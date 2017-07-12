@@ -1,8 +1,9 @@
-// This package provides a simple transformation form Java bytecode methods to integer transtions systems
+// This package provides a simple transformation from Java Bytecode methods to Tnteger Transtions Systems
 package j2i;
 
 import java.util.*;
 import java.util.function.*;
+import java.util.logging.*;
 
 import soot.*;
 import soot.Type.*;
@@ -13,16 +14,55 @@ import j2i.label.*;
 import static j2i.Formula.*;
 
 /*
-  TODOs:
-	 - compact transition systems
-	   - aggregate expressions and only use defined lables as control flow points
-	 - compute domain
-	   - we want to include static fields (possible from other classes)
-		 - remove unnecessary immediate variables
-	   -> ideally this is done on the (simplified its)
-   - integration of long operations
-   - integration of arithmetic (shift ...)
+	The following transformation uses Soot's Jimple IR. Jimple is a typed 3-address representation of byte code. Most
+	notably, putfield, getfield and method invocation occur only as specific statements. The main downside of using
+	Jimple is that it introduces a lot of temporary variables. To obtain a compact transition system, some
+	optimizations, namely chaining and argument filtering, are necessary.
+
+	Alternative approaches:
+		- Use Grimp IR: Grimp aggregates expressions and removes unused local variables, in particular stack variables.
+		Thus the Grimp IR is usually more compact and uses less local variables. Though the transformation is more
+		complex, in particular for complicated object expressions. Furthermore Soot provides annotations for Jimple
+		providing aliasing and purity information. These could be used to improve precision and implement a sound (but
+		cheap) shape and sharing analysis.
+		- It would be possible to build the abstraction as a Jimple to Jimple transformation, then using Grimp to obtain a
+		compact representation. But due to the abstraction we often introduce non-determinism which have to be represented
+		as additional control-flow constructs in Jimple.
+
+  Notes on Jimple:
+		- In Soot everything is practically a Unit or a Value and the Jimple class hierarchy allows to construct invalid
+		Jimple IR. For the transformation we expect code conform to the Jimple Grammar (see [1]).
+		- Soot constructs unique variable names for local variables. Prefix $ is used for stack variables. The
+		implementation relies on a couple of reserved variable names. Postfix ' is used for output variables, arg1, arg2,
+		... this, ret are used in method summaries, env denotes a environment variable and fresh1, ... imm1,... are used
+		for fresh variables. The Soot option -use-original-names should not be used to avoid variable capturing.
+
+
+[1] Vallée-Rai R. et al., Soot: A Java Bytecode Optimization Framework, 2010
+
+
+  TODO:
+		- make ITS output compact
+			- chaining: fix cfg point to labels and jump instructions
+			- argument filtering:
+				- ideally chaining makes stack variables obsolete
+				- current assumption is that stack variables are defined and used only once (in a Jimple block); this would
+				make things easy
+			- implementation:
+				- if we provide disjunctions for guards we construct only one statement for (non-jump) instructions, then
+				chaining blocks is easy (furthermore, disjunctions let us express (optionally) some additional expressions
+				(though there is a potential exponential blow-up).
+    - handle Strings and env like in cage
+		- handle long operations
+		- handle more arithmetic operations
+		- With default method summaries new objects are always 1; provide a default constructor (specialinvoke<init>) summary, such that 
+		a = new (); a.<specialinvoke init>(imm1,...immn) = a >= 0 /\ a <= 1 + imm1, ..., immn
+		- provide logging information
+			- capture things that are not handled or handled imprecise to get additional feedback when programs do not
+			return a bound
  */
+
+
 
 
 // size abstraction {{{ // TODO: generalise for all operations
@@ -86,6 +126,8 @@ public final class Grumpy {
 	final private Var rez  = new Var("ret");
 	final private Var thiz = new Var("this");
 
+	public static final Logger log = Logger.getLogger("Grumpy");
+
 
 	// initialisation {{{ //
 	public Grumpy(JimpleBody body){
@@ -102,7 +144,6 @@ public final class Grumpy {
 	public Transitions jimpleBody2Its() {
 		Transitions ts    = new Transitions();
 		for(Unit unit : body.getUnits()){
-			System.out.println("statement: " + unit + unit.getUseAndDefBoxes());
 			Stmt stmt       = (Stmt) unit;
 			Transitions now = this.transformStatement(stmt);
 			ts              = ts.add(now);
@@ -166,7 +207,6 @@ public final class Grumpy {
 		// TODO: update of intfields requires sign refinement
 		// we need support for disjunctions ore return multiple transitions here
 		Formula putInstanceField(InstanceFieldRef ref, Immediate imm){
-			System.out.println("instance: " + ref + ":=" + imm + "@" + imm.getClass());
 			Local base = (Local) ref.getBase();
 			Var ivar = var(base); Var ovar = pvar(base);
 			if( hasRefType(ref.getField()) ) return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,transformImmediate(imm))) );
@@ -328,7 +368,6 @@ public final class Grumpy {
 			if(msumM.isPresent()){
 				msum = msumM.get();
 			} else {
-				// System.out.println("DEF: use default summary for" + expr);
 				msum = MethodSummary.defaultSummary();
 			}
 			return evalMethodSummary(expr, msum);
@@ -368,7 +407,6 @@ public final class Grumpy {
 		String cname = ref.declaringClass().getName();
 		String mname = ref.name();
 		String descr = Util.getMethodDescriptor(ref.resolve());
-		System.out.println("trying:<" + cname + "," + mname +"," + descr +">");
 		return this.summaries.get(cname,mname,descr);
 	}
 	// }}} AssignStmt //
@@ -485,7 +523,6 @@ public final class Grumpy {
 	// Jimple Values {{{ //
 
 	private AExpr transformImmediate(Immediate imm){
-		System.out.println("imm: " + imm + "@" + imm.getClass());
 		if( imm instanceof Local )    return transformLocal((Local) imm);
 		if( imm instanceof Constant ) return transformConstant((Constant) imm);
 
