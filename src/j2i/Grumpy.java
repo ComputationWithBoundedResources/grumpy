@@ -102,6 +102,7 @@ public final class Grumpy {
 	public Transitions jimpleBody2Its() {
 		Transitions ts    = new Transitions();
 		for(Unit unit : body.getUnits()){
+			System.out.println("statement: " + unit + unit.getUseAndDefBoxes());
 			Stmt stmt       = (Stmt) unit;
 			Transitions now = this.transformStatement(stmt);
 			ts              = ts.add(now);
@@ -165,15 +166,16 @@ public final class Grumpy {
 		// TODO: update of intfields requires sign refinement
 		// we need support for disjunctions ore return multiple transitions here
 		Formula putInstanceField(InstanceFieldRef ref, Immediate imm){
+			System.out.println("instance: " + ref + ":=" + imm + "@" + imm.getClass());
 			Local base = (Local) ref.getBase();
 			Var ivar = var(base); Var ovar = pvar(base);
-			if( hasRefType(ref.getField()) ) return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,var(imm))) );
+			if( hasRefType(ref.getField()) ) return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,transformImmediate(imm))) );
 			return ge(ovar, Val.zero());
 		}
 
 		// static fields are handled like local variables
 		Formula getStaticField(Local local, StaticFieldRef ref)  { return as( pvar(local), var(ref) ); }
-		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),var(imm) ); }
+		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),transformImmediate(imm) ); }
 
 		// length abstraction for arrays
 		Formula getArrayField(Local local, ArrayRef ref){ return assignUndefined(local); } // accessed content is undefined
@@ -246,7 +248,7 @@ public final class Grumpy {
 				+ local + "@" + local.getClass() + " := " + rvalue + "@" + rvalue.getClass());
 	}
 
-	private Formula assignImmediate(Local local, Immediate imm){ return as( pvar(local),var(imm) ); }
+	private Formula assignImmediate(Local local, Immediate imm){ return as( pvar(local), transformImmediate(imm) ); }
 
 	private Formula assignRef(Local local, Ref ref){
 		Var lhs = pvar(local);
@@ -326,7 +328,7 @@ public final class Grumpy {
 			if(msumM.isPresent()){
 				msum = msumM.get();
 			} else {
-				System.out.println("DEF: use default summary for" + expr);
+				// System.out.println("DEF: use default summary for" + expr);
 				msum = MethodSummary.defaultSummary();
 			}
 			return evalMethodSummary(expr, msum);
@@ -483,6 +485,7 @@ public final class Grumpy {
 	// Jimple Values {{{ //
 
 	private AExpr transformImmediate(Immediate imm){
+		System.out.println("imm: " + imm + "@" + imm.getClass());
 		if( imm instanceof Local )    return transformLocal((Local) imm);
 		if( imm instanceof Constant ) return transformConstant((Constant) imm);
 
