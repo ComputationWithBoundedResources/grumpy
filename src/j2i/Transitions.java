@@ -11,6 +11,7 @@ public class Transitions implements Iterable<Transition> {
 	public Transitions()                                    { }
 	public Transitions(Transition t)                        { this.transitions.add(t); }
 	public Transitions(Label from, Label to)                { this.transitions.add(new Transition(from,to)); }
+	public Transitions(Label from, Constraint guard, Label to) { this.transitions.add(new Transition(from, Formula.atom(guard), to)); }
 	public Transitions(Label from, Formula guard, Label to) { this.transitions.add(new Transition(from, guard, to)); }
 	public static Transitions empty()     { return new Transitions(); }
 

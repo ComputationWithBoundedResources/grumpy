@@ -10,10 +10,9 @@ abstract public class Constraint implements PrettyPrint {
 
 	boolean hasVar(Var var){ return this.lhs.hasVar(var) || this.rhs.hasVar(var); }
 
-	public Constraint substitute(Var var, AExpr expr){
+	public void substitute(Var var, AExpr expr){
     this.lhs = this.lhs.substitute(var, expr);
     this.rhs = this.rhs.substitute(var, expr);
-		return this;
 	}
 
 	protected String ppWith(String op){ return lhs.pp() + " "	+ op + " " + rhs.pp(); }

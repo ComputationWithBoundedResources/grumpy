@@ -4,6 +4,8 @@ import org.antlr.v4.runtime.*;
 
 
 abstract public class AExpr implements PrettyPrint{
+	public static Val zero = new Val(0);
+	public static Val one  = new Val(1);
 
 	public static AExpr fromString(String expr){
 		CharStream in = CharStreams.fromString(expr);

@@ -48,6 +48,7 @@ import static j2i.Formula.*;
 				- ideally chaining makes stack variables obsolete
 				- current assumption is that stack variables are defined and used only once (in a Jimple block); this would
 				make things easy
+				- actually Jimple provides liveness analysis; so chain -> then check live variables on cfg points
 			- implementation:
 				- if we provide disjunctions for guards we construct only one statement for (non-jump) instructions, then
 				chaining blocks is easy (furthermore, disjunctions let us express (optionally) some additional expressions
@@ -55,7 +56,7 @@ import static j2i.Formula.*;
     - handle Strings and env like in cage
 		- handle long operations
 		- handle more arithmetic operations
-		- With default method summaries new objects are always 1; provide a default constructor (specialinvoke<init>) summary, such that 
+		- With default method summaries new objects are always 1; provide a default constructor (specialinvoke<init>) summary, such that
 		a = new (); a.<specialinvoke init>(imm1,...immn) = a >= 0 /\ a <= 1 + imm1, ..., immn
 		- provide logging information
 			- capture things that are not handled or handled imprecise to get additional feedback when programs do not
@@ -195,13 +196,13 @@ public final class Grumpy {
 	// node fields abstraction {{{ //
 	// reachability and cyclicity is ignored
 	// see Frohn et al, WST 2013
-	class NodeFieldsAbstraction extends SizeAbstraction {
+	final class NodeFieldsAbstraction extends SizeAbstraction {
 
 		Formula getInstanceField(Local local, InstanceFieldRef ref){
 			AExpr x = pvar(local);
 			AExpr y = var(ref.getBase());
-			if( hasIntType(local) ) return ge( x, new Neg(y) ).and(lt( x,y )); // int value can be negative
-			if( hasRefType(local) ) return ge( x, Val.zero() ).and(lt( x,y ));
+			if( hasIntType(local) ) return atom( ge(x, new Neg(y)), lt(x,y) ); // int value can be negative
+			if( hasRefType(local) ) return atom( ge(x, Val.zero)  , lt(x,y) );
 			return assignUndefined(local);
 		}
 		// TODO: update of intfields requires sign refinement
@@ -209,17 +210,17 @@ public final class Grumpy {
 		Formula putInstanceField(InstanceFieldRef ref, Immediate imm){
 			Local base = (Local) ref.getBase();
 			Var ivar = var(base); Var ovar = pvar(base);
-			if( hasRefType(ref.getField()) ) return gt(ovar, Val.zero()).and( le(ovar, new Add(ivar,transformImmediate(imm))) );
-			return ge(ovar, Val.zero());
+			if( hasRefType(ref.getField()) ) return atom( gt(ovar, Val.zero), le(ovar, new Add(ivar,transformImmediate(imm))) );
+			return atom( ge(ovar, Val.zero) );
 		}
 
 		// static fields are handled like local variables
-		Formula getStaticField(Local local, StaticFieldRef ref)  { return as( pvar(local), var(ref) ); }
-		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return as( pvar(ref),transformImmediate(imm) ); }
+		Formula getStaticField(Local local, StaticFieldRef ref)  { return atom( as(pvar(local), var(ref)) ); }
+		Formula putStaticField(StaticFieldRef ref, Immediate imm){ return atom( as(pvar(ref)   ,transformImmediate(imm)) ); }
 
 		// length abstraction for arrays
-		Formula getArrayField(Local local, ArrayRef ref){ return assignUndefined(local); } // accessed content is undefined
-		Formula putArrayField(ArrayRef ref, Immediate imm){ return assignIdentity(); } // array update does not change its length
+		Formula getArrayField(Local local, ArrayRef ref)   { return assignUndefined(local); } // accessed content is undefined
+		Formula putArrayField(ArrayRef ref, Immediate imm) { return assignIdentity(); } // array update does not change its length
 
 	}
 	// }}} node fields abstraction //
@@ -227,9 +228,8 @@ public final class Grumpy {
 
 	// Jimple Statements {{{ //
 	//
-	// For the cases consider
-	// (i) the stmt/value class hierarchy
-	// (ii) Jimple Grammar
+	// To implement chaining of blocks we want to provide only one transition for (non-labelled and non-jumping)
+	// statements. To mimic non-determinism use disjunctive guards.
 	private Transitions transformStatement(Stmt stmt){
 
 		if( stmt instanceof AssignStmt )        return transformAssignStmt((AssignStmt) stmt);
@@ -273,9 +273,9 @@ public final class Grumpy {
 		return new Transitions( currentLabel(stmt), guard, fallthrougLabel() );
 	}
 
-	private Formula assignUndefined(Local local){ 
-		if ( hasRefType(local) ) return ge( pvar(local), Val.zero() );
-		                         return as( pvar(local), transformUndefinedValue() ); 
+	private Formula assignUndefined(Local local){
+		if ( hasRefType(local) ) return atom( ge(pvar(local), Val.zero) );
+		                         return atom( as(pvar(local), transformUndefinedValue()) );
 	}
 
 	private Formula assignIdentity() { return Formula.empty(); }
@@ -288,7 +288,7 @@ public final class Grumpy {
 				+ local + "@" + local.getClass() + " := " + rvalue + "@" + rvalue.getClass());
 	}
 
-	private Formula assignImmediate(Local local, Immediate imm){ return as( pvar(local), transformImmediate(imm) ); }
+	private Formula assignImmediate(Local local, Immediate imm){ return atom( as(pvar(local), transformImmediate(imm)) ); }
 
 	private Formula assignRef(Local local, Ref ref){
 		Var lhs = pvar(local);
@@ -323,9 +323,9 @@ public final class Grumpy {
 		AExpr imm1 = transformImmediate( (Immediate) expr.getOp1() );
 		AExpr imm2 = transformImmediate( (Immediate) expr.getOp2() );
 
-		if( expr instanceof AddExpr )	return as( lhs,new Add(imm1,imm2) );
-		if( expr instanceof MulExpr ) return as( lhs,new Mul(imm1,imm2) );
-		if( expr instanceof SubExpr ) return as( lhs,new Sub(imm1,imm2) );
+		if( expr instanceof AddExpr )	return atom( as(lhs,new Add(imm1,imm2)) );
+		if( expr instanceof MulExpr ) return atom( as(lhs,new Mul(imm1,imm2)) );
+		if( expr instanceof SubExpr ) return atom( as(lhs,new Sub(imm1,imm2)) );
 
 		// CmpExpr, CmpgExpr, CmplExpr  - comparison for long, float
 		// ConditionExpr                - occur in ifgoto statements
@@ -344,15 +344,15 @@ public final class Grumpy {
 	public Formula assignInstanceOfExpr(Local local, InstanceOfExpr expr){ return assignUndefined(local); }
 
 	public Formula assignAnyNewExpr(Local local, AnyNewExpr expr){
-		if ( expr instanceof NewExpr )      return as( pvar(local),Val.one() );
-		if ( expr instanceof NewArrayExpr ) return as( pvar(local), transformImmediate((Immediate) ((NewArrayExpr) expr).getSize()) );
+		if ( expr instanceof NewExpr )      return atom( as(pvar(local),Val.one()) );
+		if ( expr instanceof NewArrayExpr ) return atom( as(pvar(local), transformImmediate((Immediate) ((NewArrayExpr) expr).getSize())) );
 		return assignUndefined(local); // NewMultiArrayExpr
 	}
 
-	public Formula assignLengthExpr(Local local, LengthExpr expr) 
-	{ return as( pvar(local), transformImmediate((Immediate) expr.getOp()) ).and( ge( pvar(local),Val.zero() ) ); }
+	public Formula assignLengthExpr(Local local, LengthExpr expr)
+	{ return atom( as(pvar(local), transformImmediate((Immediate) expr.getOp())), ge(pvar(local),Val.zero()) ); }
 
-	public Formula assignNegExpr(Local local, NegExpr expr){ return as( pvar(local), new Sub(Val.zero(),var(local)) ); }
+	public Formula assignNegExpr(Local local, NegExpr expr){ return atom( as(pvar(local), new Sub(Val.zero(),var(local))) ); }
 
 	public Formula assignInvokeExpr(Local local, InvokeExpr expr){ return  evalInvokeExpr(expr).and( as(pvar(local), this.rez) ); }
 
@@ -437,59 +437,59 @@ public final class Grumpy {
 		if ( hasIntType(op1) ){
 			if( condition instanceof GtExpr )
 				return ts
-					.add(new Transition( from, gt(imm1,imm2), to ))
-					.add(new Transition( from, le(imm1,imm2), next ));
+					.add(new Transition( from, atom( gt(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( le(imm1,imm2) ), next ));
 			if( condition instanceof GeExpr )
 				return ts
-					.add(new Transition( from, ge(imm1,imm2), to ))
-					.add(new Transition( from, lt(imm1,imm2), next ));
+					.add(new Transition( from, atom( ge(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( lt(imm1,imm2) ), next ));
 			if( condition instanceof LeExpr )
 				return ts
-					.add(new Transition( from, le(imm1,imm2), to ))
-					.add(new Transition( from, gt(imm1,imm2), next ));
+					.add(new Transition( from, atom( le(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( gt(imm1,imm2) ), next ));
 			if( condition instanceof LtExpr )
 				return ts
-					.add(new Transition( from, lt(imm1,imm2), to ))
-					.add(new Transition( from, ge(imm1,imm2), next ));
+					.add(new Transition( from, atom( lt(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( ge(imm1,imm2) ), next ));
 			if( condition instanceof EqExpr )
 				return ts
-					.add(new Transition( from, eq(imm1,imm2), to ))
-					.add(new Transition( from, gt(imm1,imm2), next ))
-					.add(new Transition( from, lt(imm1,imm2), next ));
+					.add(new Transition( from, atom( eq(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( gt(imm1,imm2) )
+								                     .or ( lt(imm1,imm2) ), next ));
 			if( condition instanceof NeExpr )
 				return ts
-					.add(new Transition( from, gt(imm1,imm2), to ))
-					.add(new Transition( from, lt(imm1,imm2), to ))
-					.add(new Transition( from, eq(imm1,imm2), next ));
+					.add(new Transition( from, atom( gt(imm1,imm2) )
+					                           .or ( lt(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( eq(imm1,imm2) ), next ));
 		}
 
 		// guards for equality tests of references and null
 		if ( hasRefType(op1) ){
 			if( condition instanceof EqExpr && op1 instanceof NullConstant ) // null == ref
 				return ts
-					.add(new Transition( from, eq(imm1,imm2), to ))
-					.add(new Transition( from, lt(imm1,imm2), next ));
+					.add(new Transition( from, atom( eq(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( lt(imm1,imm2) ), next ));
 			if( condition instanceof EqExpr && op2 instanceof NullConstant ) // ref == null
 				return ts
-					.add(new Transition( from, eq(imm1,imm2), to ))
-					.add(new Transition( from, gt(imm1,imm2), next ));
+					.add(new Transition( from, atom( eq(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( gt(imm1,imm2) ), next ));
 			if( condition instanceof EqExpr )                                // ref == ref
 				return ts
-					.add(new Transition( from, eq(imm1,imm2), to ))              // ref == ref => size(ref) == size(ref)
-					.add(new Transition( from, Formula.empty(), next ));         // ref != ref => undefined
+					.add(new Transition( from, atom( eq(imm1,imm2) ), to ))              // ref == ref => size(ref) == size(ref)
+					.add(new Transition( from, atom()               , next ));         // ref != ref => undefined
 
 			if( condition instanceof NeExpr && op1 instanceof NullConstant )
 				return ts
-					.add(new Transition( from, lt(imm1,imm2), to ))
-					.add(new Transition( from, eq(imm1,imm2), next ));
+					.add(new Transition( from, atom( lt(imm1,imm2) ), to ))
+					.add(new Transition( from, atom( eq(imm1,imm2) ), next ));
 			if( condition instanceof NeExpr && op2 instanceof NullConstant )
 				return ts
-					.add(new Transition( from, gt(imm1,imm2), to ))
-					.add(new Transition( from, eq(imm1,imm2), next ));
+					.add(new Transition( from, atom( gt(imm1,imm2)) , to ))
+					.add(new Transition( from, atom( eq(imm1,imm2)) , next ));
 			if( condition instanceof NeExpr && op2 instanceof NullConstant )
 				return ts
-					.add(new Transition( from, Formula.empty(), to ))
-					.add(new Transition( from, eq(imm1,imm2), next ));
+					.add(new Transition( from, atom()               , to ))
+					.add(new Transition( from, atom( eq(imm1,imm2) ), next ));
 		}
 
 		throw new RuntimeException("transformIfStmt: unexpected stmt: " + stmt + "@" + stmt.getClass() + ":" + condition + "@" + condition.getClass());
