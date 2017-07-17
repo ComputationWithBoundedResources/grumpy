@@ -34,6 +34,7 @@
         <delete file="src/j2i/AExprParser.java"/>
     </target>
     <target depends="clean" name="cleanall"/>
+    <target depends="clean" name="clear"/>
     <target name="antlr">
       <java jar="lib/antlr-4.7-complete.jar" fork="true">
         <arg value="src/j2i/AExpr.g4"/>
@@ -55,13 +56,30 @@
             <classpath refid="grumpy.classpath"/>
         </java>
     </target>
-    <target name="dist" depends="build">
+    <!-- git versioning -->
+    <available file=".git" type="dir" property="git.present"/>
+    <target name="buildinfo" description="Store git revision in ${repository.version}" if="git.present">
+      <exec executable="git" outputproperty="git.revision" failifexecutionfails="false" errorproperty="">
+          <arg value="describe"/>
+          <arg value="--tags"/>
+          <arg value="--always"/>
+          <arg value="HEAD"/>
+      </exec>
+      <condition property="repository.version" value="${git.revision}" else="unknown">
+          <and>
+              <isset property="git.revision"/>
+              <length string="${git.revision}" trim="yes" length="0" when="greater"/>
+          </and>
+      </condition>
+    </target>
+
+    <target name="dist" depends="build,buildinfo">
       <jar jarfile="grumpy.jar" basedir="build" includes="**" update="false">
         <fileset dir="build" includes="**"/>
         <manifest>
       	  <attribute name="Main-Class" value="Main"/>
           <attribute name="Class-Path" value="lib/json-simple-1.1.jar lib/soot-trunk.jar lib/antlr-runtime-4.7.jar"/>
-          <!--            value="${soot_loc} ${json-simple_loc} ${interproc_loc}"/> -->
+          <attribute name="Implementation-Version" value="${repository.version}"/>
         </manifest>
       </jar>
   </target>
