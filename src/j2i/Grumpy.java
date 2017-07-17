@@ -12,6 +12,7 @@ import soot.jimple.*;
 import j2i.label.*;
 
 import static j2i.Formula.*;
+import static j2i.Constraint.*;
 
 /*
 	The following transformation uses Soot's Jimple IR. Jimple is a typed 3-address representation of byte code. Most
@@ -153,6 +154,7 @@ public final class Grumpy {
 	}
 
 	public KoAT jimpleBody2KoAT(){ return new KoAT(this.domain, jimpleBody2Its()); }
+	public KoAT jimpleBody2KoAT2(){ return new KoAT(this.domain, Transitions.compact(jimpleBody2Its())); }
 
 	// helper functions {{{ //
 

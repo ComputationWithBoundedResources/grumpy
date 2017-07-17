@@ -6,51 +6,137 @@ import java.util.*;
 import java.util.stream.*;
 import java.util.function.*;
 
+// A Clause is a conjunction of constraints.
+class Clause implements PrettyPrint{
+	private List<Constraint> constraints;
+	Clause (Constraint ... cs){ 
+		this.constraints = new LinkedList<>();
+		for(Constraint c : cs) constraints.add(c); 
+	}
 
-// DNF 
-class Formula implements PrettyPrint {
-  List<List<Constraint>> dnf = new LinkedList<>();
-	
-	public static Constraint ge(AExpr lhs, AExpr rhs) { return new GeConstraint(lhs,rhs); }
-	public static Constraint gt(AExpr lhs, AExpr rhs) { return new GtConstraint(lhs,rhs); }
-	public static Constraint le(AExpr lhs, AExpr rhs) { return new LeConstraint(lhs,rhs); }
-	public static Constraint lt(AExpr lhs, AExpr rhs) { return new LtConstraint(lhs,rhs); }
-	public static Constraint eq(AExpr lhs, AExpr rhs) { return new EqConstraint(lhs,rhs); }
-	public static Constraint as(AExpr lhs, AExpr rhs) { return new AsConstraint(lhs,rhs); }
+  void addAll(Constraint ... cs) { for(Constraint c : cs) constraints.add(c); }
 
-	private static List<Constraint> toClause(Constraint ... cs){
-		List<Constraint> clause = new LinkedList<>();
-		for(Constraint c : cs) clause.add(c);
+	boolean hasVar(Var var){
+		for(Constraint c: constraints) if(c.hasVar(var)) return true;
+		return false;
+	}
+
+	Set<Var> variables(Predicate<Var> p){
+		Set<Var> vars = new HashSet<>();
+		this.addVariables(vars,p);
+		return vars;
+	}
+
+	void addVariables(Set<Var> vars, Predicate<Var> p){ for(Constraint c: constraints) c.addVariables(vars,p); }
+
+	void substitute(Map<Var,AExpr> smap){ for(Constraint c: constraints) c.substitute(smap); }
+
+	// We assume that only post-variables are considered to be modified.
+	// wlog we consider a single variable, v ... input  v' ... output
+	// case 1) v' not in [[exp_1]]: input v is the same for exp_1 and exp_2
+	// case 2) v' in [[exp_1]]:     input v is modifed
+	//   case 2.a) v' not in [[exp_2]]: v is v' after exp_1; we set [[exp_2]][v |-> v']
+	//   case 2.b) v' in     [[exp_2]]: then we introduce a fresh var v^, ie [[exp_1]][v' |-> v^] and [[exp_2]][v |-> v^]
+	static Clause compose(Clause lhs, Clause rhs){
+		Predicate<Var> isPost = v -> v.isPostVar();
+		Set<Var> lvars = lhs.variables(isPost);
+		Set<Var> rvars = rhs.variables(isPost);
+		Map<Var, AExpr> lmap = new HashMap<>();
+		Map<Var, AExpr> rmap = new HashMap<>();
+		for(Var v: lvars){
+			if(!rvars.contains(v)){ // case v'  in [[exp_1]] and v' not in [exp_2]]
+				rmap.put( Var.newPreVar(v),v );
+			} else {                // case v'  in [[exp_1]] and v' in [exp_2]]
+				Var imm = Fresh.freshImm();
+				lmap.put( v,imm );
+				rmap.put( Var.newPreVar(v),imm );
+			}
+		}
+
+		for(Constraint c: lhs.constraints) c.substitute(lmap);
+		for(Constraint c: rhs.constraints) c.substitute(rmap);
+
+		Clause clause = new Clause();
+		clause.constraints.addAll(rhs.constraints);
+		clause.constraints.addAll(lhs.constraints);
+
 		return clause;
 	}
 
-	private Formula (Constraint ... cs)           { this.dnf.add( toClause(cs) ); }
-	public static Formula atom(Constraint ... cs) { return new Formula(cs); }
-	public static Formula empty()                 { return new Formula(); }
+	@Override public String pp(){
+		StringBuilder b = new StringBuilder();
+		Iterator<Constraint> cs = constraints.iterator();
+		while(cs.hasNext()){
+			Constraint constraint = cs.next();
+			b.append( constraint.pp() );
+			if(cs.hasNext()) b.append(" && ");
+		}
+		return b.toString();
+	}
 
-	public Formula and(Constraint ... cs)  { for(List<Constraint> clause : this.dnf) Collections.addAll(clause,cs); return this; }
-	public Formula or (Constraint ... cs)  { this.dnf.add( toClause(cs) ); return this; }
+	@Override public String toString(){ return this.pp(); }
+	
+}
 
-	public Formula substitute(Var var, AExpr aexpr){ 
-		for(List<Constraint> clause: this.dnf) for(Constraint c: clause) c.substitute(var, aexpr); 
+// A Formula is a disjunction of clauses.
+class Formula implements PrettyPrint {
+  List<Clause> dnf;
+
+	Formula(){ this.dnf = new LinkedList<>(); }
+	Formula(Constraint ... cs){ 
+		this.dnf = new LinkedList<>();
+		this.dnf.add( new Clause(cs) ); 
+	}
+
+	static Formula atom(Constraint ... cs) { return new Formula(cs); }
+	static Formula empty()                 { return new Formula(); }
+
+	Formula and(Constraint ... cs)  { for(Clause clause : this.dnf) clause.addAll(cs); return this; }
+	Formula or (Constraint ... cs)  { this.dnf.add( new Clause(cs) ); return this; }
+
+	boolean hasVar(Var var){
+		for(Clause clause: this.dnf) if(clause.hasVar(var)) return true;
+		return false;
+	}
+
+	Set<Var> variables(){
+		Set<Var> vars = new HashSet<>();
+		this.addVariables(vars, v -> true);
+		return vars;
+	}
+
+	void addVariables(Set<Var> vars, Predicate<Var> p){
+		for(Clause clause: this.dnf) clause.addVariables(vars,p);
+	}
+
+	Formula substitute(Var var, AExpr aexpr){
+		Map<Var,AExpr> smap = new HashMap<>();
+		smap.put(var,aexpr);
+		return this.substitute(smap);
+	}
+	Formula substitute(Map<Var, AExpr> smap){
+		for(Clause clause: this.dnf) clause.substitute(smap);
 		return this;
 	}
-	public boolean hasVar(Var var){
-		for(List<Constraint> clause: this.dnf) for(Constraint c: clause) if(c.hasVar(var)) return true;
-		return false;
+	static Formula compose(Formula lhs, Formula rhs){
+		Formula f = new Formula();
+     
+		if(lhs.dnf.isEmpty()){ f.dnf.addAll(rhs.dnf); return f;}
+		if(rhs.dnf.isEmpty()){ f.dnf.addAll(lhs.dnf); return f;}
+		for(Clause lclause: lhs.dnf)
+			for(Clause rclause: rhs.dnf){
+				Clause c3 = Clause.compose(lclause,rclause); 
+				f.dnf.add(c3);
+			}
+		return f;
 	}
 
 	public String pp() {
 		StringBuilder b = new StringBuilder();
-		Iterator<List<Constraint>> clauses = this.dnf.iterator();
+		Iterator<Clause> clauses = this.dnf.iterator();
 		while(clauses.hasNext()){
-			List<Constraint> clause = clauses.next();
-			Iterator<Constraint> constraints = clause.iterator();
-			while(constraints.hasNext()){
-				Constraint constraint = constraints.next();
-				b.append( constraint.pp() );
-				if(constraints.hasNext()) b.append(" && ");
-			}
+			Clause clause = clauses.next();
+			b.append(clause.pp());
 			if(clauses.hasNext()) b.append(" || ");
 		}
 		return b.toString();
@@ -58,150 +144,4 @@ class Formula implements PrettyPrint {
 
 }
 
-
-// abstract class Formula{
-
-// 	public static Clause ge(AExpr lhs, AExpr rhs) { return new GeConstraint(lhs,rhs); }
-// 	public static Clause gt(AExpr lhs, AExpr rhs) { return new GtConstraint(lhs,rhs); }
-// 	public static Clause le(AExpr lhs, AExpr rhs) { return new LeConstraint(lhs,rhs); }
-// 	public static Clause lt(AExpr lhs, AExpr rhs) { return new LtConstraint(lhs,rhs); }
-// 	public static Clause eq(AExpr lhs, AExpr rhs) { return new EqConstraint(lhs,rhs); }
-// 	public static Clause as(AExpr lhs, AExpr rhs) { return new AsConstraint(lhs,rhs); }
-
-// 	public static Clause atom(Constraint c){ return new Clause(c); }
-// 	public static Clause empty(){ return new Clause(); }
-// 	public static Clause and(Constraint ... cs){ return new Clause(cs); }
-// 	public static Dnf or(Clause ... cs)        { return new Dnf(cs); }
-
-// 	public Formula substitute(Var var, AExpr aexpr){return this;}
-// }
-
-// final class Clause extends Formula {
-// 	private List<Constraint> clause = new LinkedList<Constraint>();
-
-// 	public Clause(Constraint ... cs){ Collections.addAll(this.clause, cs); }
-// 	public Clause(Clause ... cs)    { Collections.add}
-
-// }
-
-// final class Dnf extends Formula {
-//   List<Clause> dnf = new LinkedList<>();
-
-// 	public Dnf(Clause ... cs){ Collections.addAll(this.dnf, cs); }
-
-// }
-
-
-// abstract public class Formula implements PrettyPrint {
-
-// 	abstract public Formula substitute(Var var, AExpr aexpr);
-// 	abstract public Formula remove(Var var);
-// 	abstract boolean hasVar(Var var);
-
-// 	public static Formula empty() { return new Empty(); }
-// 	public static Atom ge(AExpr lhs, AExpr rhs) { return new Atom(new GeConstraint(lhs,rhs)); }
-// 	public static Atom gt(AExpr lhs, AExpr rhs) { return new Atom(new GtConstraint(lhs,rhs)); }
-// 	public static Atom le(AExpr lhs, AExpr rhs) { return new Atom(new LeConstraint(lhs,rhs)); }
-// 	public static Atom lt(AExpr lhs, AExpr rhs) { return new Atom(new LtConstraint(lhs,rhs)); }
-// 	public static Atom eq(AExpr lhs, AExpr rhs) { return new Atom(new EqConstraint(lhs,rhs)); }
-// 	public static Atom as(AExpr lhs, AExpr rhs) { return new Atom(new AsConstraint(lhs,rhs)); }
-// 	public And and(Formula a){ return new And(this, a); }
-
-// 	// Composing expressions:
-// 	// when working with input and output variables the idea is to substitute output variables of the first expression
-// 	// and input variables of the second expression with a common fresh variable; then combining the two constraints
-// 	//
-// 	// we only produce output variables for updates; eg equality is implicitly handled in the resulting ITS; then
-// 	// composing is a bit more difficult:
-// 	// used conventions:
-// 	//	 v	... input
-// 	//	 v' ... output
-// 	//	 v^ ... fresh variable
-// 	// wlog we consider a single variable
-// 	// case v' \not\in [[exp_1]]:
-// 	//	 then v hasn't changed and composition is just the conjunction
-// 	// case v' \in [[exp_1]] and v' \not\in [[exp_2]]
-// 	//	 then v is v' after exp_1; we set [[exp_2]][v |-> v']
-// 	// case v' \in [[exp_1]] and v' \in [exp_2]]
-// 	//	 then we introduce a immediate var, ie [[exp_1]][v' |-> v^] and [[exp_2]][v |-> v^]
-// 	public Formula compose(Formula fm2) { 
-
-// 		Set<Var> vars1 = new HashSet<>();
-// 		List<Var> pvars1 = vars1.stream().filter(v -> v.isPostVar()).collect(Collectors.toList());
-
-// 		Set<Var> vars2 = new HashSet<>();
-// 		Set<Var> pvars2 = vars1.stream().filter(v -> v.isPostVar()).collect(Collectors.toSet());
-// 		// List<Var> pvars2 = vars1.stream().filter(v -> v.isPostVar()).collect(Collectors.toList());
-
-		
-		
-// 		return new And(this,fm2); 
-	
-// 	}
-
-// }
-
-// class Empty extends Formula{
-
-// 	public Formula substitute(Var var, AExpr aexpr) { return this; }
-// 	public Formula remove(Var var)                  { return this; }
-// 	public boolean hasVar(Var var)                  { return false; }
-
-// 	public String pp(){ return "1 > 0"; }
-
-// }
-
-// class Atom extends Formula {
-//   Constraint constraint;
-
-//   public Atom(Constraint constraint){ this.constraint = constraint; }
-
-// 	public Formula substitute(Var var, AExpr aexpr){
-// 		this.constraint = this.constraint.substitute(var, aexpr);
-// 		return this;
-// 	}
-
-// 	public Formula remove(Var var){
-// 		if(this.constraint.hasVar(var)) return new Empty();
-// 		else return this;
-// 	}
-
-// 	public boolean hasVar(Var var) { return this.constraint.hasVar(var); }
-
-// 	public String pp(){ return this.constraint.pp(); }
-// }
-
-// abstract class BiFormula extends Formula {
-// 	Formula lhs;
-// 	Formula rhs;
-
-//   public BiFormula(Formula lhs, Formula rhs){
-// 		this.lhs = lhs;
-// 		this.rhs = rhs;
-// 	}
-
-// 	public Formula substitute(Var var, AExpr aexpr){
-// 		this.lhs = this.lhs.substitute(var, aexpr);
-// 		this.rhs = this.rhs.substitute(var, aexpr);
-// 		return this;
-// 	}
-
-// 	public Formula remove(Var var){
-// 		this.lhs = this.lhs.remove(var);
-// 		this.rhs = this.rhs.remove(var);
-// 		return this;
-// 	}
-
-// 	public boolean hasVar(Var var){
-// 	  return this.lhs.hasVar(var) || this.rhs.hasVar(var);
-// 	}
-
-// }
-
-// class And extends BiFormula {
-	
-//   public And(Formula lhs, Formula rhs){ super(lhs,rhs); }
-
-// 	public String pp(){ return this.lhs.pp() + " && " + this.rhs.pp(); }
-// }
 

@@ -31,7 +31,7 @@ public class KoAT{
 		Iterator<Var> it = this.domain.iterator();
 		while(it.hasNext()) {
 			Var v = it.next();
-			Var w = v.asPostVar();
+			Var w = Var.newPostVar(v);
 			if(guard.hasVar(w)) b.append(w);
 			else                b.append(v);
 			if(it.hasNext()) b.append(", ");
@@ -49,7 +49,7 @@ public class KoAT{
 			b.append("start(x) -> end(x)\n");
 	    return b.toString();
 		}
-		String s = this.transitions.iterator().next().from.toString();
+		String s = this.transitions.iterator().next().getFrom().toString();
 		b.append("(STARTTERM (FUNCTIONSYMBOLS " + s + "))\n");
 		b.append("(VAR )\n");
 		b.append("(RULES\n");
@@ -60,13 +60,13 @@ public class KoAT{
 		StringBuilder lhs = this.domain2String();
 
 		for(Transition t : transitions) {
-			b.append(t.from.toString());
+			b.append(t.getFrom().toString());
 			b.append(lhs);
 			b.append(" -> ");
-			b.append(t.to.toString());
-			b.append(postdomain2String(t.guard));
+			b.append(t.getTo().toString());
+			b.append(postdomain2String(t.getGuard()));
 			b.append(" :|: ");
-			b.append(t.guard.pp());
+			b.append(t.getGuard().pp());
 			b.append('\n');
 		}
 		b.append(")\n");

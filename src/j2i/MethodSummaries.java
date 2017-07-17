@@ -1,6 +1,7 @@
 package j2i;
 
 import static j2i.Formula.*;
+import static j2i.Constraint.*;
 
 import org.json.simple.*;
 import org.json.simple.parser.*;
