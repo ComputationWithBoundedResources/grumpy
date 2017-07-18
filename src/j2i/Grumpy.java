@@ -144,7 +144,6 @@ public final class Grumpy {
   protected SizeAbstraction sizeAbstraction = new NodeFieldsAbstraction();
   private int varId = 0;
 
-
   // initialisation {{{ //
   public Grumpy(JimpleBody body) {
     this.body = body;
