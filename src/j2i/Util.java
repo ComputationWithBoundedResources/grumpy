@@ -9,7 +9,7 @@ interface PrettyPrint {
   String pp();
 }
 
-class FreshSupply {
+final class FreshSupply {
 
   int id = 0;
   String prefix;
@@ -23,11 +23,16 @@ class FreshSupply {
   }
 
   Var freshVar() {
-     return new Var(this.fresh());
+    return new Var(this.fresh());
+  }
+
+  @Override
+  public java.lang.String toString() {
+    return "FreshSupply{" + "id=" + id + ", prefix='" + prefix + '\'' + '}';
   }
 }
 
-class Util {
+final class Util {
 
   // returns signature of a method <Class>:<Method><Descriptor>
   static String getSignature(SootMethod m) {

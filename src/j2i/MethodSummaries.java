@@ -10,8 +10,7 @@ import java.util.*;
 import org.json.simple.*;
 import org.json.simple.parser.*;
 
-
-class Complexity {
+final class Complexity {
 
   Optional<AExpr> upperTime;
   Optional<AExpr> lowerTime;
@@ -47,7 +46,7 @@ class Complexity {
   }
 }
 
-class Declaration implements Comparable<Declaration> {
+final class Declaration implements Comparable<Declaration> {
 
   String className;
   String methodName;
@@ -96,7 +95,6 @@ class Declaration implements Comparable<Declaration> {
     return !(descriptor != null ? !descriptor.equals(object.descriptor)
         : object.descriptor != null);
   }
-
 }
 
 
@@ -285,9 +283,8 @@ class MethodSummary {
     return fm;
   }
 
-
-  @java.lang.Override
-  public java.lang.String toString() {
+  @Override
+  public String toString() {
     return "MethodSummary{" +
         "name='" + name + '\'' +
         ", descriptor='" + descriptor + '\'' +
@@ -298,7 +295,5 @@ class MethodSummary {
         ", modifies=" + modifies +
         '}';
   }
-
 }
-
 

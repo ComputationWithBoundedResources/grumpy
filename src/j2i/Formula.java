@@ -6,7 +6,7 @@ import java.util.function.*;
 import java.util.stream.*;
 
 // A Clause is a conjunction of constraints.
-class Clause implements PrettyPrint {
+final class Clause implements PrettyPrint {
 
   private List<Constraint> constraints;
 
@@ -103,13 +103,12 @@ class Clause implements PrettyPrint {
 
   @Override
   public String toString() {
-    return this.pp();
+    return "Clause{" + "constraints=" + constraints + '}';
   }
-
 }
 
 // A Formula is a disjunction of clauses.
-class Formula implements PrettyPrint {
+final class Formula implements PrettyPrint {
 
   List<Clause> dnf;
 
@@ -196,6 +195,7 @@ class Formula implements PrettyPrint {
     return this;
   }
 
+  @Override
   public String pp() {
     StringBuilder b = new StringBuilder();
     Iterator<Clause> clauses = this.dnf.iterator();
@@ -209,6 +209,9 @@ class Formula implements PrettyPrint {
     return b.toString();
   }
 
+  @Override
+  public String toString() {
+    return "Formula{" + "dnf=" + dnf + '}';
+  }
 }
-
 

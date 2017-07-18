@@ -5,12 +5,36 @@ import java.util.function.Predicate;
 import org.antlr.v4.runtime.*;
 
 
-abstract public class AExpr implements PrettyPrint {
+abstract class AExpr implements PrettyPrint {
 
-  public static Val zero = new Val(0);
-  public static Val one = new Val(1);
+  static Val zero = new Val(0);
+  static Val one = new Val(1);
 
-  public static AExpr fromString(String expr) {
+  static AExpr add(AExpr lhs, AExpr rhs) {
+    return new Add(lhs, rhs);
+  }
+
+  static AExpr mul(AExpr lhs, AExpr rhs) {
+    return new Mul(lhs, rhs);
+  }
+
+  static AExpr sub(AExpr lhs, AExpr rhs) {
+    return new Sub(lhs, rhs);
+  }
+
+  static AExpr neg(AExpr e) {
+    return new Neg(e);
+  }
+
+  static AExpr val(Long v) {
+    return new Val(v);
+  }
+
+  static AExpr var(String v) {
+    return new Var(v);
+  }
+
+  static AExpr fromString(String expr) {
     CharStream in = CharStreams.fromString(expr);
     AExprLexer lexer = new AExprLexer(in);
     CommonTokenStream tokens = new CommonTokenStream(lexer);
@@ -20,12 +44,11 @@ abstract public class AExpr implements PrettyPrint {
     return e;
   }
 
-  abstract public boolean hasVar(Var var);
+  abstract boolean hasVar(Var var);
 
   abstract void addVariables(Set<Var> vars, Predicate<Var> p);
 
   abstract AExpr substitute(Map<Var, AExpr> smap);
-
 }
 
 abstract class BinExpr extends AExpr {
@@ -34,7 +57,7 @@ abstract class BinExpr extends AExpr {
   AExpr rhs;
 
   @Override
-  public boolean hasVar(Var var) {
+  boolean hasVar(Var var) {
     return this.lhs.hasVar(var) || this.rhs.hasVar(var);
   }
 
@@ -45,97 +68,96 @@ abstract class BinExpr extends AExpr {
   }
 
   @Override
-  public AExpr substitute(Map<Var, AExpr> smap) {
+  AExpr substitute(Map<Var, AExpr> smap) {
     this.lhs = this.lhs.substitute(smap);
     this.rhs = this.rhs.substitute(smap);
     return this;
   }
-
 
   protected String ppWith(String op) {
     return "(" + this.lhs.pp() + " " + op + " " + this.rhs.pp() + ")";
   }
 }
 
-class Add extends BinExpr {
+final class Add extends BinExpr {
 
-  public Add(AExpr lhs, AExpr rhs) {
+  Add(AExpr lhs, AExpr rhs) {
     this.lhs = lhs;
     this.rhs = rhs;
   }
 
-  public Add(String lhs, String rhs) {
+  Add(String lhs, String rhs) {
     this.lhs = new Var(lhs);
     this.rhs = new Var(rhs);
   }
 
   @Override
-  public String toString() {
-    return "(+ " + lhs + " " + rhs + ")";
-  }
-
   public String pp() {
     return ppWith("+");
   }
 
+  @Override
+  public String toString() {
+    return "Add{" + "lhs=" + lhs + ", rhs=" + rhs + '}';
+  }
 }
 
-class Mul extends BinExpr {
+final class Mul extends BinExpr {
 
-  public Mul(AExpr lhs, AExpr rhs) {
+  Mul(AExpr lhs, AExpr rhs) {
     this.lhs = lhs;
     this.rhs = rhs;
   }
 
-  public Mul(String lhs, String rhs) {
+  Mul(String lhs, String rhs) {
     this.lhs = new Var(lhs);
     this.rhs = new Var(rhs);
   }
 
   @Override
-  public String toString() {
-    return "(* " + lhs + " " + rhs + ")";
-  }
-
   public String pp() {
     return ppWith("*");
   }
 
+  @Override
+  public String toString() {
+    return "Mul{" + "lhs=" + lhs + ", rhs=" + rhs + '}';
+  }
 }
 
-class Sub extends BinExpr {
+final class Sub extends BinExpr {
 
-  public Sub(AExpr lhs, AExpr rhs) {
+  Sub(AExpr lhs, AExpr rhs) {
     this.lhs = lhs;
     this.rhs = rhs;
   }
 
-  public Sub(String lhs, String rhs) {
+  Sub(String lhs, String rhs) {
     this.lhs = new Var(lhs);
     this.rhs = new Var(rhs);
   }
 
   @Override
-  public String toString() {
-    return "(- " + lhs + " " + rhs + ")";
-  }
-
   public String pp() {
     return ppWith("-");
   }
 
+  @Override
+  public String toString() {
+    return "Sub{" + "lhs=" + lhs + ", rhs=" + rhs + '}';
+  }
 }
 
-class Neg extends AExpr {
+final class Neg extends AExpr {
 
   AExpr neg;
 
-  public Neg(AExpr neg) {
+  Neg(AExpr neg) {
     this.neg = neg;
   }
 
   @Override
-  public boolean hasVar(Var var) {
+  boolean hasVar(Var var) {
     return this.neg.hasVar(var);
   }
 
@@ -146,41 +168,40 @@ class Neg extends AExpr {
 
 
   @Override
-  public AExpr substitute(Map<Var, AExpr> smap) {
+  AExpr substitute(Map<Var, AExpr> smap) {
     this.neg = this.neg.substitute(smap);
     return this;
   }
 
   @Override
-  public String toString() {
-    return "(- " + neg + ")";
-  }
-
   public String pp() {
     return "(-" + neg.pp() + ")";
   }
 
+  @Override
+  public String toString() {
+    return "Neg{" + "neg=" + neg + '}';
+  }
 }
 
-
-class Val extends AExpr {
+final class Val extends AExpr {
 
   long val;
 
-  public Val(long val) {
+  Val(long val) {
     this.val = val;
   }
 
-  public static Val one() {
+  static Val one() {
     return new Val(1);
   }
 
-  public static Val zero() {
+  static Val zero() {
     return new Val(0);
   }
 
   @Override
-  public boolean hasVar(Var var) {
+  boolean hasVar(Var var) {
     return false;
   }
 
@@ -189,61 +210,59 @@ class Val extends AExpr {
   }
 
   @Override
-  public AExpr substitute(Map<Var, AExpr> smap) {
+  AExpr substitute(Map<Var, AExpr> smap) {
     return this;
   }
 
   @Override
-  public String toString() {
-    return Long.toString(val);
-  }
-
   public String pp() {
     if (this.val >= 0) {
-      return this.toString();
+      return Long.toString(val);
     } else {
-      return "(" + this.toString() + ")";
+      return "(" + Long.toString(val) + ")";
     }
   }
 
+  @java.lang.Override
+  public java.lang.String toString() {
+    return "Val{" + "val=" + val + '}';
+  }
 }
 
-
-class Var extends AExpr {
+final class Var extends AExpr {
 
   String symb;
   boolean post = false;
 
-  public Var(String symb) {
+  Var(String symb) {
     this.symb = symb;
   }
 
-  public Var(String symb, boolean post) {
+  Var(String symb, boolean post) {
     this.symb = symb;
     this.post = post;
   }
 
-  public static Var newPostVar(Var var) {
+  static Var newPostVar(Var var) {
     return new Var(var.symb, true);
   }
 
-  public static Var newPreVar(Var var) {
+  static Var newPreVar(Var var) {
     return new Var(var.symb);
   }
 
-
-  public boolean isPostVar() {
+  boolean isPostVar() {
     return this.post;
   }
 
   @Override
-  public AExpr substitute(Map<Var, AExpr> smap) {
+  AExpr substitute(Map<Var, AExpr> smap) {
     AExpr expr = smap.get(this);
     return expr != null ? expr : this;
   }
 
   @Override
-  public boolean hasVar(Var var) {
+  boolean hasVar(Var var) {
     return this.equals(var);
   }
 
@@ -255,15 +274,14 @@ class Var extends AExpr {
   }
 
   @Override
-  public String toString() {
+  public String pp() {
     return this.symb + (this.post ? "'" : "");
   }
 
   @Override
-  public String pp() {
-    return this.toString();
+  public String toString() {
+    return "Var{" + "symb='" + symb + '\'' + ", post=" + post + '}';
   }
-
 
   @Override
   public boolean equals(Object o) {
@@ -291,5 +309,4 @@ class Var extends AExpr {
   }
 
 }
-
 

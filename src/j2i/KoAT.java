@@ -3,7 +3,7 @@ package j2i;
 import java.io.*;
 import java.util.*;
 
-public class KoAT {
+final public class KoAT implements PrettyPrint {
 
   private Domain domain;
   private Transitions transitions;
@@ -49,7 +49,7 @@ public class KoAT {
   }
 
   @Override
-  public String toString() {
+  public String pp() {
     StringBuilder b = new StringBuilder();
     b.append("(GOAL COMPLEXITY)\n");
     if (this.transitions.isEmpty()) {
@@ -81,7 +81,10 @@ public class KoAT {
     return b.toString();
   }
 
-
+  @Override
+  public String toString() {
+    return "KoAT{" + "domain=" + domain + ", transitions=" + transitions + '}';
+  }
 }
 
 

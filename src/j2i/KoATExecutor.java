@@ -3,7 +3,7 @@ package j2i;
 import java.io.*;
 import java.util.*;
 
-public class KoATExecutor {
+final public class KoATExecutor {
 
   private KoAT problem;
   private String[] options = new String[0];
