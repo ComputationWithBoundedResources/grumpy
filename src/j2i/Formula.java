@@ -24,6 +24,7 @@ class Clause implements PrettyPrint {
   //   case 2.a) v' not in [[exp_2]]: v is v' after exp_1; we set [[exp_2]][v |-> v']
   //   case 2.b) v' in     [[exp_2]]: then we introduce a fresh var v^, ie [[exp_1]][v' |-> v^] and [[exp_2]][v |-> v^]
   static Clause compose(Clause lhs, Clause rhs) {
+    FreshSupply f = new FreshSupply("imm#");
     Predicate<Var> isPost = v -> v.isPostVar();
     Set<Var> lvars = lhs.variables(isPost);
     Set<Var> rvars = rhs.variables(isPost);
@@ -33,7 +34,7 @@ class Clause implements PrettyPrint {
       if (!rvars.contains(v)) { // case v'  in [[exp_1]] and v' not in [exp_2]]
         rmap.put(Var.newPreVar(v), v);
       } else {                // case v'  in [[exp_1]] and v' in [exp_2]]
-        Var imm = Fresh.freshImm();
+        Var imm = f.freshVar();
         lmap.put(v, imm);
         rmap.put(Var.newPreVar(v), imm);
       }
