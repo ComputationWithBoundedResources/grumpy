@@ -39,6 +39,18 @@ abstract class Constraint implements PrettyPrint {
     return new AsConstraint(lhs, rhs);
   }
 
+  static Constraint positive(AExpr e) {
+    return new GtConstraint(e, Val.zero);
+  }
+
+  static Constraint nonnegative(AExpr e) {
+    return new GeConstraint(e, Val.zero);
+  }
+
+  static Constraint negative(AExpr e) {
+    return new LtConstraint(e, Val.zero);
+  }
+
   boolean hasVar(Var var) {
     return this.lhs.hasVar(var) || this.rhs.hasVar(var);
   }

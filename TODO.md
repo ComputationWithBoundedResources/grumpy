@@ -3,22 +3,26 @@
 
   - [ ] provide valid KoAT output
     - [ ] transform DNF formula into multiple transitions
-    - [ ] compute domain from transition system
+    - [ ] compute domain
+      - [ ] use predicate for locals to filter assignment and invoke statement
+      - [ ] reduce Jimple stack variables \*
+  - [ ] sensible built-in default summaries for standard libraries
+    - [ ] special default summary for <specialinvoke init>
 
-Note: we can just take the locals provided by soot and collect the accessed
-static fields. But Soot introduces a lot of stack variables, even for simple
-programs. A simple (but possible incomplete) heuristic is to assume that stack
-variables are only alive in sequence blocks. Thus if we just can ignore them if
-we compose all sequences wrt to jump instructions. Alternatively, we could try
-Soot's also provides live-ness analysis.
 
-  - [ ] sensible default summaries for standard libraries
-
+\*Note: A simple (but possible incomplete) heuristic is to assume that stack
+variables are only alive in sequence blocks. Thus we can ignore them if we
+compose sequences wrt. to jump instructions. Alternatively, Soot provides a
+live-ness analysis.
 
 ### Features & Optimisations
 
-  - [ ] provide different configurations
+  - [ ] cheap and sound type based reachability and dag analysis
+  - [ ] provide logging information for things that are not handled
+  - [ ] configuration
     - [ ] path-length and nodes-abstraction
     - [ ] only numerical abstraction
-    - [ ] exact arithmetic
+    - [ ] binop for long
+    - [ ] binop (shift,...)
+  - [ ] Strings and env variable
 

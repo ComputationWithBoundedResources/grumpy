@@ -108,6 +108,7 @@ final class Clause implements PrettyPrint {
 }
 
 // A Formula is a disjunction of clauses.
+// We use (Constraint ...) to denote a clause.
 final class Formula implements PrettyPrint {
 
   List<Clause> dnf;

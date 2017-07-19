@@ -1,6 +1,7 @@
 // This package provides a simple transformation from Java Bytecode methods to Tnteger Transtions Systems
 package j2i;
 
+import static j2i.AExpr.*;
 import static j2i.Constraint.*;
 import static j2i.Formula.*;
 
@@ -38,97 +39,7 @@ import soot.jimple.*;
 
 
 [1] Vallée-Rai R. et al., Soot: A Java Bytecode Optimization Framework, 2010
-
-
-  TODO:
-		- make ITS output compact
-			- chaining: fix cfg point to labels and jump instructions
-			- argument filtering:
-				- ideally chaining makes stack variables obsolete
-				- current assumption is that stack variables are defined and used only once (in a Jimple block); this would
-				make things easy
-				- actually Jimple provides liveness analysis; so chain -> then check live variables on cfg points
-			- implementation:
-				- if we provide disjunctions for guards we construct only one statement for (non-jump) instructions, then
-				chaining blocks is easy (furthermore, disjunctions let us express (optionally) some additional expressions
-				(though there is a potential exponential blow-up).
-    - handle Strings and env like in cage
-		- handle long operations
-		- handle more arithmetic operations
-		- With default method summaries new objects are always 1; provide a default constructor (specialinvoke<init>) summary, such that
-		a = new (); a.<specialinvoke init>(imm1,...immn) = a >= 0 /\ a <= 1 + imm1, ..., immn
-		- provide logging information
-			- capture things that are not handled or handled imprecise to get additional feedback when programs do not
-			return a bound
  */
-
-
-// size abstraction {{{ // TODO: generalise for all operations
-// interface for size abstraction
-// * in Jimple getfield/putfield occur only in limited form (see Jimple grammar)
-// * for method calls we use summaries
-// * used assumptions
-//   a == null => size(a) = 0
-//   a != null => size(a) > 0
-//   a == b => size(a) == size(b)
-//   size(new A) = 1
-//   size(new A[imm]) = imm
-abstract class SizeAbstraction {
-
-  abstract Formula putInstanceField(InstanceFieldRef ref, Immediate imm);  // x.f = imm
-
-  abstract Formula putStaticField(StaticFieldRef ref, Immediate imm);      // X.f = imm
-
-  abstract Formula putArrayField(ArrayRef ref, Immediate imm);             // x[imm1] = imm2
-
-  abstract Formula getInstanceField(Local local, InstanceFieldRef ref); // x = y.f
-
-  abstract Formula getStaticField(Local local, StaticFieldRef ref);     // x = Y.f
-
-  abstract Formula getArrayField(Local local, ArrayRef ref);            // x = y[imm]
-}
-// }}} size abstraction //
-
-// domain {{{ //
-final class Domain implements Iterable<Var> {
-
-  Set<Var> elements = new LinkedHashSet<>();
-
-  public void addLocals(JimpleBody body) {
-    for (Local local : body.getLocals()) {
-      this.elements.add(Grumpy.var(local));
-    }
-    // if(Grumpy.isPrimitive(local)) this.elements.add( Grumpy.var(local) );
-  }
-
-  public void add(Var v) {
-    this.elements.add(v);
-  }
-
-  public void addFields(JimpleBody body) {
-    for (SootField field : body.getMethod().getDeclaringClass().getFields()) {
-      if (Grumpy.isPrimitive(field)) {
-        this.elements.add(Grumpy.var(field));
-      }
-    }
-  }
-
-  public boolean hasElem(Var var) {
-    return this.elements.contains(var);
-  }
-
-  @Override
-  public Iterator<Var> iterator() {
-    return this.elements.iterator();
-  }
-
-  @Override
-  public String toString() {
-    return "Domain{" + "elements = " + elements + "}";
-  }
-}
-
-// }}} domain //
 
 
 public final class Grumpy {
@@ -144,7 +55,6 @@ public final class Grumpy {
   protected SizeAbstraction sizeAbstraction = new NodeFieldsAbstraction();
   private int varId = 0;
 
-  // initialisation {{{ //
   public Grumpy(JimpleBody body) {
     this.body = body;
     this.labelMaker = new LabelMaker(body);
@@ -153,7 +63,6 @@ public final class Grumpy {
     this.domain.addFields(body);
     this.summaries = MethodSummaries.fromFile("summaries.json");
   }
-  // }}} initialisation //
 
   protected static boolean isPrimitive(final SootField field) {
     return Modifier.isStatic(field.getModifiers()) && isPrimitive(field.getType());
@@ -167,7 +76,6 @@ public final class Grumpy {
     return isPrimitive(val.getType());
   }
 
-  // helper functions {{{ //
 
   static String getSymbol(Value value) {
     return value.toString();
@@ -209,16 +117,29 @@ public final class Grumpy {
     return new Var(getSymbol(ref.getBase()), true);
   }
 
+  // we treat long as int
+  private static boolean hasIntType(Type type) {
+    return Type.toMachineType(type) instanceof IntType || type instanceof LongType;
+  }
+
+  private static boolean hasRefType(Type type) {
+    return type instanceof RefLikeType;
+  }
+
   private static boolean hasIntType(Value val) {
-    return Type.toMachineType(val.getType()) instanceof IntType;
+    return hasIntType(val.getType());
   }
 
   private static boolean hasRefType(Value val) {
-    return val.getType() instanceof RefLikeType;
+    return hasRefType(val.getType());
+  }
+
+  private static boolean hasIntType(SootField field) {
+    return hasIntType(field.getType());
   }
 
   private static boolean hasRefType(SootField field) {
-    return field.getType() instanceof RefLikeType;
+    return hasRefType(field.getType());
   }
 
   protected Var freshVar() {
@@ -259,9 +180,7 @@ public final class Grumpy {
     return this.labelMaker.fallthroughLabel();
   }
 
-  // }}} helper functions //
 
-  // Jimple Statements {{{ //
   //
   // To implement chaining of blocks we want to provide only one transition for (non-labelled and non-jumping)
   // statements. To mimic non-determinism use disjunctive guards.
@@ -304,9 +223,7 @@ public final class Grumpy {
     throw new RuntimeException(
         "transformStatement: unexpected statement: " + stmt + "@" + stmt.getClass());
   }
-  // }}} node fields abstraction //
 
-  // AssignStmt {{{ //
   private Transitions transformAssignStmt(AssignStmt stmt) {
     Value op1 = stmt.getLeftOp();
     Value op2 = stmt.getRightOp();
@@ -333,10 +250,6 @@ public final class Grumpy {
       return atom(ge(pvar(local), Val.zero));
     }
     return atom(as(pvar(local), transformUndefinedValue()));
-  }
-
-  private Formula assignIdentity() {
-    return Formula.empty();
   }
 
   private Formula assignRValue(Local local, Value rvalue) {
@@ -521,7 +434,6 @@ public final class Grumpy {
     Stmt target = (Stmt) stmt.getTarget();
     return new Transitions(currentLabel(stmt), targetLabel(target));
   }
-  // }}} AssignStmt //
 
   // We have  imm1 condop imm2
   private Transitions transformIfStmt(IfStmt stmt) {
@@ -659,9 +571,6 @@ public final class Grumpy {
     throw new RuntimeException("transformImmediate: unexpected imm: " + imm + "@" + imm.getClass());
   }
 
-  // }}} Jimple Statements //
-
-  // Jimple Values {{{ //
 
   public AExpr transformLocal(Local local) {
     return var(local);
@@ -685,58 +594,112 @@ public final class Grumpy {
     return freshVar();
   }
 
-  // node fields abstraction {{{ //
-  // reachability and cyclicity is ignored
-  // see Frohn et al, WST 2013
-  final class NodeFieldsAbstraction extends SizeAbstraction {
+// * Size Abstraction ------------------------------------------------------------------------------------------------
 
-    Formula getInstanceField(Local local, InstanceFieldRef ref) {
-      AExpr x = pvar(local);
-      AExpr y = var(ref.getBase());
-      if (hasIntType(local)) {
-        return atom(ge(x, new Neg(y)), lt(x, y)); // int value can be negative
-      }
-      if (hasRefType(local)) {
-        return atom(ge(x, Val.zero), lt(x, y));
-      }
-      return assignUndefined(local);
-    }
+  // interface for size abstraction
+  // * in Jimple getfield/putfield occur only in limited form (see Jimple grammar)
+  // * for method calls we use summaries
+  // * at the moment sharing and cyclicity is ignored
+  // * general used assumptions
+  //   a == null => size(a) = 0
+  //   a != null => size(a) > 0
+  //   a == b => size(a) == size(b)
+  //   size(new A) = 1
+  //   size(new A[imm]) = imm
+  abstract class SizeAbstraction {
 
-    // TODO: update of intfields requires sign refinement
-    // we need support for disjunctions ore return multiple transitions here
-    Formula putInstanceField(InstanceFieldRef ref, Immediate imm) {
-      Local base = (Local) ref.getBase();
-      Var ivar = var(base);
-      Var ovar = pvar(base);
-      if (hasRefType(ref.getField())) {
-        return atom(gt(ovar, Val.zero), le(ovar, new Add(ivar, transformImmediate(imm))));
-      }
-      return atom(ge(ovar, Val.zero));
-    }
+    abstract Formula putInstanceField(InstanceFieldRef ref, Immediate imm);
 
-    // static fields are handled like local variables
-    Formula getStaticField(Local local, StaticFieldRef ref) {
-      return atom(as(pvar(local), var(ref)));
-    }
+    abstract Formula getInstanceField(Local local, InstanceFieldRef ref);
+
+    // static fields are like local variables
 
     Formula putStaticField(StaticFieldRef ref, Immediate imm) {
       return atom(as(pvar(ref), transformImmediate(imm)));
     }
 
-    // length abstraction for arrays
+    Formula getStaticField(Local local, StaticFieldRef ref) {
+      return atom(as(pvar(local), var(ref)));
+    }
+
+    // length abstraction for array operations
+
+    // x[imm1] = imm2; x is not modified
+    Formula putArrayField(ArrayRef ref, Immediate imm) {
+      return atom();
+    }
+
+    // x = y[imm]; x' is undefined
     Formula getArrayField(Local local, ArrayRef ref) {
       return assignUndefined(local);
-    } // accessed content is undefined
-
-    Formula putArrayField(ArrayRef ref, Immediate imm) {
-      return assignIdentity();
-    } // array update does not change its length
-
+    }
   }
 
-  // }}} Jimple Values //
+  // see Frohn et al, WST 2013
+  // reachable nodes + absolute value of integer fields
+  final class NodeFieldsAbstraction extends SizeAbstraction {
+
+    // x = y.f
+    // case1: y.f is of type integer, then x' > -y /\ x' < y
+    // case2: x.f is of type ref    , then x' >= 0 /\ x' < y
+    // otherwise: x' is undefined
+    Formula getInstanceField(Local local, InstanceFieldRef ref) {
+      AExpr x = pvar(local);
+      AExpr y = var(ref.getBase());
+      return hasIntType(ref.getField())
+          ? atom(gt(x, neg(y)), lt(x, y))
+          : hasRefType(ref.getField())
+              ? atom(nonnegative(x), lt(x, y))
+              : assignUndefined(local);
+    }
+
+    // x.f = y
+    // case1: y is of type integer, then x' > 0 /\ if y >= 0 then x' <= x + y else x' <= x + (-y)
+    // case2: y is of type ref    , then x' > 0 /\ x' <= x + y
+    // otherwise: x is not modified
+    Formula putInstanceField(InstanceFieldRef ref, Immediate imm) {
+      Local base = (Local) ref.getBase();
+      Var ivar = var(base);
+      Var ovar = pvar(base);
+      AExpr val = transformImmediate(imm);
+      return
+          hasIntType(imm)
+              ? atom(positive(ovar), positive(val), le(ovar, add(ivar, val)))
+              .or(positive(ovar), negative(val), le(ovar, add(ivar, neg(val))))
+              : hasRefType(imm)
+                  ? atom(positive(ovar), le(ovar, add(ivar, val)))
+                  : atom();
+    }
+  }
+
+  // see F. Spoto et al, A Termination Analyzer for Java Bytecode Based on Path-Length, 2010
+  // max (simple) path; fields are ignored
+  final class SimplePathLengthAbstraction extends SizeAbstraction {
+
+    // x.f = y
+    // case1: y is of ref, then x' >= 0 /\ x' < y
+    // otherwise: x' is undefined
+    Formula getInstanceField(Local local, InstanceFieldRef ref) {
+      AExpr x = pvar(local);
+      AExpr y = var(ref.getBase());
+      return hasRefType(ref.getField())
+          ? atom(ge(x, Val.zero), lt(x, y))
+          : assignUndefined(local);
+    }
+
+    // x.f = y
+    // case`: y is of type ref    , then x' > 0 /\ x' <= x + y
+    // otherwise: x is not modified
+    Formula putInstanceField(InstanceFieldRef ref, Immediate imm) {
+      Local base = (Local) ref.getBase();
+      Var ivar = var(base);
+      Var ovar = pvar(base);
+      return hasRefType(imm)
+          ? atom(gt(ovar, Val.zero), le(ovar, new Add(ivar, transformImmediate(imm))))
+          : atom(gt(ovar, Val.zero), as(ovar, ivar));
+    }
+  }
 
 }
 
-// vi:set noet sw=2 ts=2 tw=118 fdm=marker:
 
