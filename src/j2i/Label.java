@@ -1,7 +1,6 @@
 package j2i;
 
 import java.util.*;
-
 import soot.*;
 import soot.jimple.JimpleBody;
 
@@ -58,8 +57,6 @@ final class Label {
     return this.defined;
   }
 }
-
-
 
 // To generate labels for the ITS we introduce an 'instruction' counter.
 

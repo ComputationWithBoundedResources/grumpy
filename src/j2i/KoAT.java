@@ -13,13 +13,18 @@ final public class KoAT implements PrettyPrint {
     this.transitions = transitions;
   }
 
+  public KoAT compact() {
+    this.transitions = Transitions.compact(this.transitions);
+    return this;
+  }
+
   public StringBuilder domain2String() {
     StringBuilder b = new StringBuilder();
     b.append("(");
     Iterator<Var> it = this.domain.iterator();
     while (it.hasNext()) {
       Var v = it.next();
-      b.append(v);
+      b.append(v.pp());
       if (it.hasNext()) {
         b.append(", ");
       }
@@ -28,7 +33,7 @@ final public class KoAT implements PrettyPrint {
     return b;
   }
 
-  public StringBuilder postdomain2String(Formula guard) {
+  public StringBuilder postdomain2String(Clause guard) {
     StringBuilder b = new StringBuilder();
     b.append("(");
     Iterator<Var> it = this.domain.iterator();
@@ -36,9 +41,9 @@ final public class KoAT implements PrettyPrint {
       Var v = it.next();
       Var w = Var.newPostVar(v);
       if (guard.hasVar(w)) {
-        b.append(w);
+        b.append(w.pp());
       } else {
-        b.append(v);
+        b.append(v.pp());
       }
       if (it.hasNext()) {
         b.append(", ");
@@ -68,14 +73,24 @@ final public class KoAT implements PrettyPrint {
     StringBuilder lhs = this.domain2String();
 
     for (Transition t : transitions) {
-      b.append(t.getFrom().toString());
-      b.append(lhs);
-      b.append(" -> ");
-      b.append(t.getTo().toString());
-      b.append(postdomain2String(t.getGuard()));
-      b.append(" :|: ");
-      b.append(t.getGuard().pp());
-      b.append('\n');
+      StringBuilder r = new StringBuilder();
+      r.append(t.getFrom().toString());
+      r.append(lhs);
+      r.append(" -> ");
+      r.append(t.getTo().toString());
+      if (t.getGuard().isEmpty()) {
+        b.append(r);
+        b.append(domain2String());
+        b.append('\n');
+      } else {
+        for (Clause c : t.getGuard()) {
+          b.append(r);
+          b.append(postdomain2String(c));
+          b.append(" :|: ");
+          b.append(c.pp());
+          b.append('\n');
+        }
+      }
     }
     b.append(")\n");
     return b.toString();

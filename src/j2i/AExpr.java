@@ -223,8 +223,8 @@ final class Val extends AExpr {
     }
   }
 
-  @java.lang.Override
-  public java.lang.String toString() {
+  @Override
+  public String toString() {
     return "Val{" + "val=" + val + '}';
   }
 }

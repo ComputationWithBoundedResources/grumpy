@@ -6,7 +6,7 @@ import java.util.function.*;
 import java.util.stream.*;
 
 // A Clause is a conjunction of constraints.
-final class Clause implements PrettyPrint {
+final class Clause implements Iterable<Constraint>, PrettyPrint {
 
   private List<Constraint> constraints;
 
@@ -24,7 +24,7 @@ final class Clause implements PrettyPrint {
   //   case 2.a) v' not in [[exp_2]]: v is v' after exp_1; we set [[exp_2]][v |-> v']
   //   case 2.b) v' in     [[exp_2]]: then we introduce a fresh var v^, ie [[exp_1]][v' |-> v^] and [[exp_2]][v |-> v^]
   static Clause compose(Clause lhs, Clause rhs) {
-    FreshSupply f = new FreshSupply("imm#");
+    FreshSupply f = new FreshSupply("imm.");
     Predicate<Var> isPost = v -> v.isPostVar();
     Set<Var> lvars = lhs.variables(isPost);
     Set<Var> rvars = rhs.variables(isPost);
@@ -88,6 +88,11 @@ final class Clause implements PrettyPrint {
   }
 
   @Override
+  public Iterator<Constraint> iterator() {
+    return this.constraints.iterator();
+  }
+
+  @Override
   public String pp() {
     StringBuilder b = new StringBuilder();
     Iterator<Constraint> cs = constraints.iterator();
@@ -109,7 +114,7 @@ final class Clause implements PrettyPrint {
 
 // A Formula is a disjunction of clauses.
 // We use (Constraint ...) to denote a clause.
-final class Formula implements PrettyPrint {
+final class Formula implements Iterable<Clause>, PrettyPrint {
 
   List<Clause> dnf;
 
@@ -119,7 +124,9 @@ final class Formula implements PrettyPrint {
 
   Formula(Constraint... cs) {
     this.dnf = new LinkedList<>();
-    this.dnf.add(new Clause(cs));
+    if (cs.length > 0) {
+      this.dnf.add(new Clause(cs));
+    }
   }
 
   static Formula atom(Constraint... cs) {
@@ -133,11 +140,11 @@ final class Formula implements PrettyPrint {
   static Formula compose(Formula lhs, Formula rhs) {
     Formula f = new Formula();
 
-    if (lhs.dnf.isEmpty()) {
+    if (lhs.isEmpty()) {
       f.dnf.addAll(rhs.dnf);
       return f;
     }
-    if (rhs.dnf.isEmpty()) {
+    if (rhs.isEmpty()) {
       f.dnf.addAll(lhs.dnf);
       return f;
     }
@@ -160,6 +167,10 @@ final class Formula implements PrettyPrint {
   Formula or(Constraint... cs) {
     this.dnf.add(new Clause(cs));
     return this;
+  }
+
+  boolean isEmpty() {
+    return this.dnf.isEmpty();
   }
 
   boolean hasVar(Var var) {
@@ -194,6 +205,11 @@ final class Formula implements PrettyPrint {
       clause.substitute(smap);
     }
     return this;
+  }
+
+  @Override
+  public Iterator<Clause> iterator() {
+    return this.dnf.iterator();
   }
 
   @Override

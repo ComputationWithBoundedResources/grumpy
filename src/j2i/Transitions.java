@@ -31,7 +31,7 @@ final class Transitions implements Iterable<Transition>, PrettyPrint {
     return new Transitions();
   }
 
-  //
+
   static Transitions compact(Transitions transitions) {
     Transitions result = new Transitions();
     if (transitions.isEmpty()) {
@@ -44,9 +44,8 @@ final class Transitions implements Iterable<Transition>, PrettyPrint {
     while (it.hasNext()) {
       Transition nxt = it.next();
       Optional<Transition> tmp = Optional.empty();
-      G.v().out.println(cur + "*" + nxt);
-      if (cur.getTo().isDefined() || nxt.getFrom().isDefined()) {
-        // if(cur.getTo().isDefined() || nxt.getFrom().isDefined() || !(tmp = Transition.compose(cur,nxt)).isPresent()){
+      // not optimal we should distinguish
+      if (cur.getTo().isDefined() || nxt.getTo().isDefined() || nxt.getFrom().isDefined()) {
         result.add(cur);
         cur = nxt;
       } else {
@@ -56,14 +55,14 @@ final class Transitions implements Iterable<Transition>, PrettyPrint {
     }
     result.add(cur);
 
-    G.v().out.println("*** compact");
-    for (Transition t : transitions) {
-      G.v().out.println(t.pp());
-    }
-    G.v().out.println(">>>");
-    for (Transition t : result) {
-      G.v().out.println(t.pp());
-    }
+    // G.v().out.println("*** compact");
+    // for (Transition t : transitions) {
+    //   G.v().out.println(t.pp());
+    // }
+    // G.v().out.println(">>>");
+    // for (Transition t : result) {
+    //   G.v().out.println(t.pp());
+    // }
 
     return result;
   }

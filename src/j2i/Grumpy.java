@@ -41,6 +41,16 @@ import soot.jimple.*;
  */
 
 
+// TODO
+// wrapper for Transitions to simplify composing transtions
+abstract class ControlFlow{}
+
+class Fallthrough extends ControlFlow{}
+class Goto extends ControlFlow{}
+class IfGoto extends ControlFlow{}
+class Switch extends ControlFlow{}
+
+
 public final class Grumpy {
 
   public static final Logger log = Logger.getLogger("Grumpy");
@@ -151,6 +161,7 @@ public final class Grumpy {
       Stmt stmt = (Stmt) unit;
       Transitions now = this.transformStatement(stmt);
       ts = ts.add(now);
+      G.v().out.println(stmt + ">>>\n\t" + now.pp());
     }
     return ts;
   }
@@ -159,8 +170,9 @@ public final class Grumpy {
     return new KoAT(this.domain, jimpleBody2Its());
   }
 
-  public KoAT jimpleBody2KoAT2() {
-    return new KoAT(this.domain, Transitions.compact(jimpleBody2Its()));
+  public KoAT jimpleBody2KoAT(boolean compose) {
+    KoAT k = new KoAT(this.domain, jimpleBody2Its());
+    return compose ? k.compact() : k;
   }
 
   private boolean hasDefinedLabel(Unit stmt) {

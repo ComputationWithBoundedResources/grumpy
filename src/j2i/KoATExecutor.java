@@ -21,10 +21,12 @@ final public class KoATExecutor {
     try {
 
       File tmp = File.createTempFile("method", ".koat");
-      tmp.deleteOnExit();
+      // TODO: add option; keep file
+      // add some info to KoAT, eg name of method
+      // tmp.deleteOnExit();
 
       try (PrintWriter out = new PrintWriter(tmp.getAbsoluteFile())) {
-        out.println(this.problem);
+        out.println(this.problem.pp());
       }
       String[] command = new String[this.options.length + 2];
       command[0] = "koat";
