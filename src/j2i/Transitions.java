@@ -1,6 +1,5 @@
 package j2i;
 
-import j2i.label.Label;
 import java.util.*;
 import soot.*;
 

@@ -5,7 +5,6 @@ import static j2i.AExpr.*;
 import static j2i.Constraint.*;
 import static j2i.Formula.*;
 
-import j2i.label.*;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.*;
