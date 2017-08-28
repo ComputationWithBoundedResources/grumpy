@@ -13,42 +13,63 @@ import soot.Type.*;
 import soot.jimple.*;
 
 /*
-  The following transformation uses Soot's Jimple IR. Jimple is a typed 3-address representation of byte code. Most
-	notably, putfield, getfield and method invocation occur only as specific statements. The main downside of using
-	Jimple is that it introduces a lot of temporary variables. To obtain a compact transition system, some
-	optimizations, namely chaining and argument filtering, are necessary.
 
-	Alternative approaches:
-		- Use Grimp IR: Grimp aggregates expressions and removes unused local variables, in particular stack variables.
-		Thus the Grimp IR is usually more compact and uses less local variables. Though the transformation is more
-		complex, in particular for complicated object expressions. Furthermore Soot provides annotations for Jimple
-		providing aliasing and purity information. These could be used to improve precision and implement a sound (but
-		cheap) shape and sharing analysis.
-		- It would be possible to build the abstraction as a Jimple to Jimple transformation, then using Grimp to obtain a
-		compact representation. But due to the abstraction we often introduce non-determinism which have to be represented
-		as additional control-flow constructs in Jimple.
+XXX
 
-  Notes on Jimple:
-		- In Soot everything is practically a Unit or a Value and the Jimple class hierarchy allows to construct invalid
-		Jimple IR. For the transformation we expect code conform to the Jimple Grammar (see [1]).
-		- Soot constructs unique variable names for local variables. Prefix $ is used for stack variables. The
-		implementation relies on a couple of reserved variable names. Postfix ' is used for output variables, arg1, arg2,
-		... this, ret are used in method summaries, env denotes a environment variable and fresh1, ... imm1,... are used
-		for fresh variables. The Soot option -use-original-names should not be used to avoid variable capturing.
+Jimple
+  In Soot everything is practically a Unit or a Value and the Jimple class hierarchy [1] (allows to construct invalid
+  Jimple IR. For the transformation we expect code to be conform to the Jimple Grammar [2].
 
+  Soot constructs unique variable names for local variables. Prefix $ is used for stack variables. The implementation
+  relies on a couple of reserved variable names. Postfix ' is used for output variables, arg1, arg2, ... this, ret are
+  used in method summaries, env denotes a environment variable and fresh1, ... imm1,... are used for fresh variables.
+  The Soot option -use-original-names should not be used to avoid variable capturing.
 
-[1] Vallée-Rai R. et al., Soot: A Java Bytecode Optimization Framework, 2010
- */
+  [1] https://soot-build.cs.uni-paderborn.de/doc/soot/
+  [2] Vallée-Rai R. et al., Soot: A Java Bytecode Optimization Framework, 2010
 
+Implementation
+  A short overview of the implementation:
 
-// TODO
-// wrapper for Transitions to simplify composing transtions
-abstract class ControlFlow{}
+  The provided transformation is a simple syntactical transformation not making use of a fixed-point construction.
+  Each statement is translated in one, two (or more) transitions depending on the possible flow of the statement.
+  Here, a transition is a 5 tuple consisting of the source label, target label, lower bound cost, upper bound cost and
+  a guard. A guard is a DNF Formula over atoms. An atom is a comparison constraint between arithmetic expressions. We
+  use primed Variables to indicate post variables.
+  Jimple code contains labelled and unlabelled statements. For the transformation we additionally provide an
+  instruction counter to generate labels for the transition system.
+  The implementation provides a path-length abstraction for arrays and objects. Sharing information is ignored, hence
+  the abstraction is unsound. 
+  Method summaries are used for method calls. A method summary is considered to abstract all possible calls. 
 
-class Fallthrough extends ControlFlow{}
-class Goto extends ControlFlow{}
-class IfGoto extends ControlFlow{}
-class Switch extends ControlFlow{}
+Method Summaries.
+  Execution requires summary files relative to runtime "./summaries.json". The default summary uses constant
+  complexity. No warning is given if the default summary is used.
+
+KoAT
+  Recommended Flags: --use-its-parser --use-termcomp-format
+
+Optimisations
+  Variable Domain.
+    At the moment we add all local variables provided by a Soot method, cf Domain.addLocals.
+
+    Jimple's 3-address code introduces (a lot of) intermediate variables for stack operations (usually indicated with
+    prefix '$'). We want to reduce the number of variables. A simple (but possible incomplete) heuristic is to assume
+    that stack variables are only alive in sequence blocks. Thus we can ignore them if we compose sequences wrt. jump
+    instructions. Alternatively, Soot provides a live-ness analysis. KoAT also implements argument filtering.
+
+    The local variables do not contain static field references. In particular something simple like for(int i =0; i < MAX; i++);
+    is not handled as MAX is considered undefined.
+
+  Support for Long and other Arithmetic Operations.
+    Comparison for long values use special operators which are currently ignored. Thus loops using long values are
+    currently not handled. The result of such operations is 0 or 1. This can be easily supported with DNF constraints.
+
+  Type based shape and reachability analysis to provide optionally a (more) sound abstraction.
+
+  Special `env` for environment not supported.
+
+*/
 
 
 public final class Grumpy {
@@ -433,7 +454,6 @@ public final class Grumpy {
   // Soot provides JVM method references for InvokeExpr.
   // The declaring class is a super type of the runtime instance and we assume that the corresponding summary is
   // a representation of all possible calls.
-  // We ignore descriptors for now (unsound).
   private Optional<MethodSummary> resolve(SootMethodRef ref) {
     String cname = ref.declaringClass().getName();
     String mname = ref.name();
@@ -712,5 +732,4 @@ public final class Grumpy {
   }
 
 }
-
 
