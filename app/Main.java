@@ -48,7 +48,7 @@ final class RunGrumpy extends BodyTransformer {
     // G.v().out.println("[Grumpy] " + Util.getSignature(body.getMethod()) + " >>> " + answer);
 
     G.v().out.println("[Grumpy] >>> " + Util.getSignature(body.getMethod()));
-		G.v().out.println("[Grumpy] \n" + its.pp());
+		// G.v().out.println("[Grumpy] \n" + its.pp());
     G.v().out.println("[Grumpy] <<< " + answer);
   }
 
