@@ -15,9 +15,10 @@ import soot.options.Options;
 public class Main {
 
 	public static void main(String[] margs) {
-		Transform t = new Transform("jtp.Jimple2ItsTransformer", new Jimple2ItsTransformer());
-		// Transform t = new Transform("jtp.RunGrumpy", new RunGrumpy());
+		Transform t = new Transform("jtp.grumpy", new RunGrumpy());
+    t.setDeclaredOptions("enabled summaries-file");
 		PackManager.v().getPack("jtp").add(t);
+
 		Options.v().set_output_format(Options.output_format_none);
 		soot.Main.main(margs);
 	}
@@ -31,9 +32,9 @@ public class Main {
 final class RunGrumpy extends BodyTransformer {
 
   @Override
-	protected void internalTransform(Body body, String string, Map map) {
+	protected void internalTransform(Body body, String string, Map opts) {
 
-    Grumpy m = new Grumpy((JimpleBody) body);
+    Grumpy m = new Grumpy((JimpleBody) body, opts);
     String[] args =
       { "-timeout", "30"
       , "--smt-solver", "z3-internal"

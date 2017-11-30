@@ -11,6 +11,7 @@ import java.util.logging.*;
 import soot.*;
 import soot.Type.*;
 import soot.jimple.*;
+import soot.PhaseOptions;
 
 /*
 
@@ -74,7 +75,6 @@ Optimisations
 
 public final class Grumpy {
 
-  public static final Logger log = Logger.getLogger("Grumpy");
   final static Var res = new Var("res");
   final private Var rez = new Var("ret");
   final private Var thiz = new Var("this");
@@ -85,14 +85,21 @@ public final class Grumpy {
   protected SizeAbstraction sizeAbstraction = new NodeFieldsAbstraction();
   private int varId = 0;
 
-  public Grumpy(JimpleBody body) {
+  public Grumpy(JimpleBody body, Map<String, String> opts){
     this.body = body;
     this.labelMaker = new LabelMaker(body);
     this.domain = new Domain();
     this.domain.addLocals(body);
     this.domain.addFields(body);
-    this.summaries = MethodSummaries.fromFile("summaries.json");
+    String fp = PhaseOptions.getString(opts, "summaries-file");
+    this.summaries = MethodSummaries.fromFile( fp.isEmpty() ? "summaries.json" : fp );
   }
+
+  public Grumpy(JimpleBody body) {
+    this(body, new HashMap<String,String>());
+  }
+
+
 
   protected static boolean isPrimitive(final SootField field) {
     return Modifier.isStatic(field.getModifiers()) && isPrimitive(field.getType());
