@@ -182,7 +182,7 @@ public final class Grumpy {
       Stmt stmt = (Stmt) unit;
       Transitions now = this.transformStatement(stmt);
       ts = ts.add(now);
-      G.v().out.println(stmt + ">>>\n\t" + now.pp());
+      Debug.trace(stmt + ">>>\n\t" + now.pp());
     }
     return ts;
   }
@@ -550,7 +550,7 @@ public final class Grumpy {
             .add(new Transition(from, atom(gt(imm1, imm2)), to))
             .add(new Transition(from, atom(eq(imm1, imm2)), next));
       }
-      if (condition instanceof NeExpr && op2 instanceof NullConstant) {
+      if (condition instanceof NeExpr) {
         return ts
             .add(new Transition(from, atom(), to))
             .add(new Transition(from, atom(eq(imm1, imm2)), next));

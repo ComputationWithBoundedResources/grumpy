@@ -10,12 +10,16 @@ The transformation features
   * a size based abstraction for arrays and objects.
 
 The library is _not_ intended to handle full-fledged Java Bytecode programs.
-But some (yet undefined) subset that supports _while_ programs and textbook algorithms with objects and arrays.
+But some (not clearly defined) subset that supports _while_ programs and some textbook algorithms using objects and arrays.
+
+##### Unsound Approximations
+
   * integer-like types are treated as unbounded integer
   * (narrowing) type conversions are ignored
-  * method calls are treated via dedicated method summaries
+  * method calls are treated via dedicated method summaries ([see examples/summares.json](examples/summaries.json))
   * exceptional control-flow is ignored
   * simplified unsound object abstraction
+
 
 #### Installation
 
@@ -39,7 +43,7 @@ This repository provides a library and an example application.
 
 ##### Library
 
-The `Grumpy` library provides the transformation from `Soot's` internal
+The `Grumpy` library provides a `soot.BodyTransformer` from `Soot's` internal
 representation `Jimple` to (weighted) transitions. A transition is a triple
 `<from,guard,to>`, where `from` and `to` are labels and `guard` is
 a conjunction of constraints over arithmetic expressions.
@@ -47,10 +51,10 @@ a conjunction of constraints over arithmetic expressions.
 
 ##### Application
 
-The main-application is just a wrapper for the `Soot's` function.
+The main-application is just a wrapper for `Soot's` main function.
 
 ```bash
-$ cat Arrays.java
+$ cat examples/Arrays.java
 public class Arrays {
 
  static int[] reverse(int[] arr){
@@ -62,8 +66,8 @@ public class Arrays {
   }
 
 }
-$ javac Arrays.java
-$ java -jar grumpy.jar -pp -cp . Arrays
+$ javac examples/Arrays.java
+$ java -jar grumpy.jar -pp -cp examples Arrays
 Soot started on Fri Aug 25 09:11:57 CEST 2017
 Transforming Arrays...
 

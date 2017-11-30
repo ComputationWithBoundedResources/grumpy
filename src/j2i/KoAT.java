@@ -57,12 +57,7 @@ final public class KoAT implements PrettyPrint {
   public String pp() {
     StringBuilder b = new StringBuilder();
     b.append("(GOAL COMPLEXITY)\n");
-    if (this.transitions.isEmpty()) {
-      b.append("(STARTTERM (FUNCTIONSYMBOLS start))\n");
-      b.append("start(x) -> end(x)\n");
-      return b.toString();
-    }
-    String s = this.transitions.iterator().next().getFrom().toString();
+    String s = this.transitions.isEmpty() ? "start" : this.transitions.iterator().next().getFrom().toString();
     b.append("(STARTTERM (FUNCTIONSYMBOLS " + s + "))\n");
     b.append("(VAR )\n");
     b.append("(RULES\n");

@@ -32,10 +32,10 @@ final class FreshSupply {
   }
 }
 
-final class Util {
+public final class Util {
 
   // returns signature of a method <Class>:<Method><Descriptor>
-  static String getSignature(SootMethod m) {
+  public static String getSignature(SootMethod m) {
     String nearlySig = m.getBytecodeSignature();
     nearlySig = nearlySig.substring(1, nearlySig.length() - 1);
     String[] sigSegs = nearlySig.split(":");
@@ -44,10 +44,20 @@ final class Util {
   }
 
   // returns JVM Method descriptor of a method
-  static String getMethodDescriptor(SootMethod m) {
+  public static String getMethodDescriptor(SootMethod m) {
     String s = m.getBytecodeSignature();
     s = s.substring(1, s.length() - 1);
     String[] ss = s.split("\\(");
     return "(" + ss[1];
   }
 }
+
+final class Debug {
+  static boolean doTrace = false;
+  static void trace(String s) {
+    if(Debug.doTrace){
+      System.out.println(s);
+    }
+  };
+}
+

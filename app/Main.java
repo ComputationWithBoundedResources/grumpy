@@ -15,8 +15,8 @@ import soot.options.Options;
 public class Main {
 
 	public static void main(String[] margs) {
-		Transform t = new Transform("jtp.Jbc2Its", new Jimple2ItsTransformer());
-		// Transform t = new Transform("jtp.Jbc2Its", new WithKoAT());
+		Transform t = new Transform("jtp.Jimple2ItsTransformer", new Jimple2ItsTransformer());
+		// Transform t = new Transform("jtp.RunGrumpy", new RunGrumpy());
 		PackManager.v().getPack("jtp").add(t);
 		Options.v().set_output_format(Options.output_format_none);
 		soot.Main.main(margs);
@@ -24,6 +24,36 @@ public class Main {
 
 }
 
+// Run Grumpy+Koat on Methodbody.
+//
+// Example Output:
+// [Grumpy] >>> fi.iki.elonen.NanoHTTPD$Method.lookup(Ljava/lang/String;)Lfi/iki/elonen/NanoHTTPD$Method;  WORST_CASE(?, O(n^1))
+final class RunGrumpy extends BodyTransformer {
+
+  @Override
+	protected void internalTransform(Body body, String string, Map map) {
+
+    Grumpy m = new Grumpy((JimpleBody) body);
+    String[] args =
+      { "-timeout", "30"
+      , "--smt-solver", "z3-internal"
+      , "--use-its-parser"
+      , "--use-termcomp-format"
+      , "--no-print-proof" };
+
+    KoAT its = m.jimpleBody2KoAT();
+		String answer = new KoATExecutor(its,args).execute();
+
+    // G.v().out.println("[Grumpy] " + Util.getSignature(body.getMethod()) + " >>> " + answer);
+
+    G.v().out.println("[Grumpy] >>> " + Util.getSignature(body.getMethod()));
+		G.v().out.println("[Grumpy] \n" + its.pp());
+    G.v().out.println("[Grumpy] <<< " + answer);
+  }
+
+}
+
+// Print Its Only
 final class Jimple2ItsTransformer extends BodyTransformer {
 
 	@Override
@@ -34,6 +64,7 @@ final class Jimple2ItsTransformer extends BodyTransformer {
 	}
 }
 
+//
 final class WithKoAT extends BodyTransformer {
 
 	@Override
